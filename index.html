@@ -3,6 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#1a1a2e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
 <title>篮球战术板</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -162,6 +167,25 @@ h1 { margin-bottom: 8px; font-size: 22px; }
   cursor: not-allowed;
 }
 
+.file-warning {
+  width: 800px;
+  max-width: 96vw;
+  margin-top: 8px;
+  padding: 10px 14px;
+  background: #7c2d12;
+  color: #fde68a;
+  border-radius: 6px;
+  font-size: 13px;
+  text-align: center;
+  display: none;
+}
+.file-warning code {
+  background: rgba(0,0,0,0.3);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: monospace;
+}
+
 #file-input { display: none; }
 </style>
 </head>
@@ -189,6 +213,10 @@ h1 { margin-bottom: 8px; font-size: 22px; }
   <button id="btn-reset-step" class="warn" onclick="resetStep()">🔄 重置步骤</button>
   <button id="btn-reset-all" onclick="resetAll()">🗑 重置全部</button>
   <button id="btn-record" onclick="playAll(true)">📹 保存视频</button>
+</div>
+
+<div class="file-warning" id="file-warning">
+  ⚠️ 当前通过本地文件(file://)打开，视频录制功能不可用。如需保存视频，请通过 HTTP 服务器访问本页面：<code>python3 -m http.server 8080</code>
 </div>
 
 <div class="court-container" id="court">
@@ -448,10 +476,17 @@ function updateUI() {
     return;
   }
 
+  const isFileProtocol = window.location.protocol === 'file:';
   btnResetAll.disabled = false;
   btnPlay.disabled = totalSteps < 1;
-  btnRecord.disabled = totalSteps < 1;
+  btnRecord.disabled = totalSteps < 1 || isFileProtocol;
+  btnRecord.title = (isFileProtocol && totalSteps >= 1)
+    ? '通过本地文件(file://)打开时无法录制视频，请通过 HTTP 服务器访问（如 python3 -m http.server）'
+    : '';
   slider.disabled = false;
+
+  const fileWarn = document.getElementById('file-warning');
+  if (fileWarn) fileWarn.style.display = isFileProtocol ? 'block' : 'none';
 
   if (currentStep < 0) {
     stepInfo.textContent = `初始摆放`;
@@ -727,8 +762,21 @@ async function playAll(shouldRecord = false) {
     canvas.height = rect.height * dpr;
     ctx.scale(dpr, dpr);
 
-    // 用 XHR 加载图片为 Blob 再解码，避免 Firefox file:// 下 cross-origin 导致 canvas tainted
-    const courtImg = await loadLocalImage('basketball_court.png');
+    // 加载背景图：优先 XHR Blob（避免 Firefox 跨域 taint），file:// 下 XHR 会被阻止则回退
+    let courtImg;
+    try {
+      courtImg = await loadLocalImage('basketball_court.png');
+    } catch (imgErr) {
+      if (shouldRecord && window.location.protocol === 'file:') {
+        throw new Error('通过本地文件(file://)打开时无法录制视频，请通过 HTTP 服务器访问（如 python3 -m http.server）');
+      }
+      courtImg = new Image();
+      await new Promise((resolve, reject) => {
+        courtImg.onload = resolve;
+        courtImg.onerror = reject;
+        courtImg.src = 'basketball_court.png';
+      });
+    }
 
     // 编码选择：Safari 支持 mp4，Chrome/Edge/Firefox 优先 vp8（兼容性最好）
     let mimeType = null;
@@ -937,6 +985,13 @@ window.addEventListener('resize', () => {
 
 // ==================== 启动 ====================
 init();
+
+// 注册 Service Worker（PWA 离线支持）
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('service-worker.js').catch(err => {
+    console.warn('Service Worker 注册失败:', err);
+  });
+}
 </script>
 
 </body>
