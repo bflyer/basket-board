@@ -53,17 +53,7 @@ h1 { margin-bottom: 8px; font-size: 22px; }
   text-align: center;
 }
 
-#annotation-input {
-  padding: 6px 10px;
-  border: none;
-  border-radius: 5px;
-  font-size: 13px;
-  width: 160px;
-  background: #16213e;
-  color: #eee;
-}
-#annotation-input::placeholder { color: #888; }
-#annotation-input:disabled { opacity: 0.4; }
+
 
 .speed-label {
   display: flex;
@@ -138,6 +128,40 @@ h1 { margin-bottom: 8px; font-size: 22px; }
   font-size: 10px; border-color: #ffb703;
 }
 
+.annotation-box {
+  width: 800px;
+  max-width: 96vw;
+  margin-top: 10px;
+  background: #16213e;
+  border-radius: 8px;
+  padding: 14px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.annotation-box label {
+  font-size: 14px;
+  color: #aaa;
+}
+.annotation-box textarea {
+  width: 100%;
+  background: #0f3460;
+  border: none;
+  border-radius: 6px;
+  padding: 12px 14px;
+  color: #fff;
+  font-size: 16px;
+  font-family: 'Microsoft YaHei', sans-serif;
+  resize: vertical;
+  min-height: 64px;
+  line-height: 1.5;
+}
+.annotation-box textarea::placeholder { color: #888; }
+.annotation-box textarea:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 #file-input { display: none; }
 </style>
 </head>
@@ -148,7 +172,6 @@ h1 { margin-bottom: 8px; font-size: 22px; }
 <div class="controls">
   <button id="btn-prev" onclick="goPrev()">⬅ 上一步</button>
   <span class="step-info" id="step-info">初始摆放</span>
-  <input type="text" id="annotation-input" placeholder="步骤注释..." maxlength="60" disabled>
   <button id="btn-finish" class="primary" onclick="finishStep()">✅ 完成步骤</button>
   <button id="btn-play" onclick="playAll(false)">▶ 播放全部</button>
   <label class="speed-label">
@@ -174,6 +197,11 @@ h1 { margin-bottom: 8px; font-size: 22px; }
   <canvas id="play-canvas"></canvas>
 </div>
 
+<div class="annotation-box" id="annotation-box">
+  <label>步骤注释</label>
+  <textarea id="annotation-text" rows="2" placeholder="在此输入当前步骤的注释，播放时会同步显示..." maxlength="120" disabled></textarea>
+</div>
+
 <script>
 // ==================== 常量 ====================
 const PIECE_COUNT = 11;
@@ -196,7 +224,7 @@ const court = document.getElementById('court');
 const trailLayer = document.getElementById('trail-layer');
 const playCanvas = document.getElementById('play-canvas');
 const stepInfo = document.getElementById('step-info');
-const annoInput = document.getElementById('annotation-input');
+const annoInput = document.getElementById('annotation-text');
 
 annoInput.addEventListener('input', function() {
   if (currentStep >= 0 && steps[currentStep]) {
@@ -415,7 +443,8 @@ function updateUI() {
 
   if (isPlaying) {
     stepInfo.textContent = `播放中…`;
-    [btnPrev, btnUndo, btnResetStep, btnFinish, btnPlay, btnRecord, btnResetAll, slider, annoInput].forEach(b => b.disabled = true);
+    [btnPrev, btnUndo, btnResetStep, btnFinish, btnPlay, btnRecord, btnResetAll, slider].forEach(b => b.disabled = true);
+    annoInput.disabled = true;
     return;
   }
 
@@ -592,18 +621,18 @@ function roundRectPath(ctx, x, y, w, h, r) {
   ctx.closePath();
 }
 
-function drawAnnotationOnCanvas(ctx, text, canvasW) {
+function drawAnnotationOnCanvas(ctx, text, canvasW, canvasH) {
   if (!text) return;
   ctx.save();
-  ctx.font = 'bold 14px "Microsoft YaHei", sans-serif';
+  ctx.font = 'bold 18px "Microsoft YaHei", sans-serif';
   const metrics = ctx.measureText(text);
-  const padding = 14;
+  const padding = 18;
   const w = Math.min(metrics.width + padding * 2, canvasW - 20);
-  const h = 28;
+  const h = 38;
   const x = (canvasW - w) / 2;
-  const y = 12;
-  ctx.fillStyle = 'rgba(0,0,0,0.65)';
-  roundRectPath(ctx, x, y, w, h, 8);
+  const y = canvasH - h - 14;
+  ctx.fillStyle = 'rgba(0,0,0,0.7)';
+  roundRectPath(ctx, x, y, w, h, 10);
   ctx.fill();
   ctx.fillStyle = '#fff';
   ctx.textAlign = 'center';
@@ -641,6 +670,42 @@ function easeInOut(t) {
   return t < 0.5 ? 2*t*t : 1 - Math.pow(-2*t+2, 2)/2;
 }
 
+async function loadLocalImage(url) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('GET', url, true);
+    xhr.responseType = 'blob';
+    xhr.onload = () => {
+      if (xhr.status === 200 || xhr.status === 0) {
+        const blob = xhr.response;
+        const blobUrl = URL.createObjectURL(blob);
+        const img = new Image();
+        img.onload = () => {
+          URL.revokeObjectURL(blobUrl);
+          resolve(img);
+        };
+        img.onerror = () => reject(new Error('图片解码失败'));
+        img.src = blobUrl;
+      } else {
+        reject(new Error('图片加载失败: ' + xhr.status));
+      }
+    };
+    xhr.onerror = () => reject(new Error('图片网络请求失败'));
+    xhr.send();
+  });
+}
+
+async function loadFixWebmDuration() {
+  if (typeof window.ysFixWebmDuration === 'function') return;
+  return new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = 'https://unpkg.com/fix-webm-duration@1.0.5/fixwebmduration.js';
+    script.onload = resolve;
+    script.onerror = () => reject(new Error('无法加载 WebM 修复库'));
+    document.head.appendChild(script);
+  });
+}
+
 async function playAll(shouldRecord = false) {
   if (isPlaying || steps.length < 1) return;
   isPlaying = true;
@@ -648,130 +713,166 @@ async function playAll(shouldRecord = false) {
 
   const canvas = document.getElementById('play-canvas');
   const ctx = canvas.getContext('2d');
-  canvas.style.display = 'block';
-  court.querySelectorAll('.piece').forEach(el => el.style.display = 'none');
-  trailLayer.style.display = 'none';
-
-  const rect = court.getBoundingClientRect();
-  const dpr = window.devicePixelRatio || 1;
-  canvas.width = rect.width * dpr;
-  canvas.height = rect.height * dpr;
-  ctx.scale(dpr, dpr);
-
-  const courtImg = new Image();
-  courtImg.src = 'basketball_court.png';
-  await new Promise((resolve, reject) => {
-    courtImg.onload = resolve;
-    courtImg.onerror = reject;
-  });
-
   let recorder = null;
   const chunks = [];
-  if (shouldRecord) {
-    const stream = canvas.captureStream(30);
-    let mimeType = 'video/webm';
-    if (MediaRecorder.isTypeSupported('video/webm; codecs=vp9')) {
-      mimeType = 'video/webm; codecs=vp9';
-    } else if (MediaRecorder.isTypeSupported('video/webm; codecs=vp8')) {
-      mimeType = 'video/webm; codecs=vp8';
-    }
-    try {
-      recorder = new MediaRecorder(stream, { mimeType });
-    } catch (e) {
-      recorder = new MediaRecorder(stream);
-    }
-    recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
-    recorder.start(100);
-  }
 
-  let base = clonePositions(setupPositions);
-  for (let s = 0; s < steps.length; s++) {
-    const step = steps[s];
-    const startPos = clonePositions(base);
-    const endPos = applyStepMoves(base, step);
-    const duration = STEP_PLAY_MS / playSpeed;
-    const holdTime = STEP_HOLD_MS / playSpeed;
+  try {
+    canvas.style.display = 'block';
+    court.querySelectorAll('.piece').forEach(el => el.style.display = 'none');
+    trailLayer.style.display = 'none';
 
-    const playPaths = new Array(PIECE_COUNT).fill(null);
-    if (step && step.moves) {
-      const groups = {};
-      for (const move of step.moves) {
-        if (!groups[move.pieceIndex]) groups[move.pieceIndex] = [];
-        groups[move.pieceIndex].push(move.points);
+    const rect = court.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    ctx.scale(dpr, dpr);
+
+    // 用 XHR 加载图片为 Blob 再解码，避免 Firefox file:// 下 cross-origin 导致 canvas tainted
+    const courtImg = await loadLocalImage('basketball_court.png');
+
+    // 编码选择：Safari 支持 mp4，Chrome/Edge/Firefox 优先 vp8（兼容性最好）
+    let mimeType = null;
+    const candidates = [
+      'video/mp4',
+      'video/webm; codecs=vp8',
+      'video/webm; codecs=vp9',
+      'video/webm'
+    ];
+    for (const type of candidates) {
+      if (MediaRecorder.isTypeSupported(type)) {
+        mimeType = type;
+        break;
       }
-      for (let i = 0; i < PIECE_COUNT; i++) {
-        const lists = groups[i];
-        if (!lists) continue;
-        let merged = [{x: startPos[i].x, y: startPos[i].y}];
-        for (const pts of lists) {
-          const last = merged[merged.length - 1];
-          const first = pts[0];
-          const dist = Math.hypot(first.x - last.x, first.y - last.y);
-          if (dist < 3 && pts.length > 1) {
-            merged = merged.concat(pts.slice(1));
-          } else {
-            merged = merged.concat(pts);
-          }
+    }
+    if (!mimeType) mimeType = 'video/webm';
+
+    if (shouldRecord) {
+      const stream = canvas.captureStream(30);
+      try {
+        recorder = new MediaRecorder(stream, { mimeType });
+      } catch (e) {
+        recorder = new MediaRecorder(stream);
+      }
+      recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+      recorder.start(100);
+    }
+
+    let base = clonePositions(setupPositions);
+    for (let s = 0; s < steps.length; s++) {
+      const step = steps[s];
+      const startPos = clonePositions(base);
+      const endPos = applyStepMoves(base, step);
+      const duration = STEP_PLAY_MS / playSpeed;
+      const holdTime = STEP_HOLD_MS / playSpeed;
+
+      const playPaths = new Array(PIECE_COUNT).fill(null);
+      if (step && step.moves) {
+        const groups = {};
+        for (const move of step.moves) {
+          if (!groups[move.pieceIndex]) groups[move.pieceIndex] = [];
+          groups[move.pieceIndex].push(move.points);
         }
-        playPaths[i] = merged;
-      }
-    }
-
-    await new Promise(resolve => {
-      const startTime = performance.now();
-      function frame(now) {
-        const rawT = Math.min(1, (now - startTime) / duration);
-        const t = easeInOut(rawT);
-
-        ctx.clearRect(0, 0, rect.width, rect.height);
-        ctx.drawImage(courtImg, 0, 0, rect.width, rect.height);
-        drawPlaybackTrails(ctx, s);
-
         for (let i = 0; i < PIECE_COUNT; i++) {
-          const pts = playPaths[i];
-          let pos;
-          if (pts && pts.length >= 2) {
-            pos = interpolatePath(pts, t);
-          } else {
-            pos = startPos[i];
+          const lists = groups[i];
+          if (!lists) continue;
+          let merged = [{x: startPos[i].x, y: startPos[i].y}];
+          for (const pts of lists) {
+            const last = merged[merged.length - 1];
+            const first = pts[0];
+            const dist = Math.hypot(first.x - last.x, first.y - last.y);
+            if (dist < 3 && pts.length > 1) {
+              merged = merged.concat(pts.slice(1));
+            } else {
+              merged = merged.concat(pts);
+            }
           }
-          drawPieceOnCanvas(ctx, pos.x, pos.y, TYPES[i], LABELS[i]);
-        }
-        drawAnnotationOnCanvas(ctx, step.annotation, rect.width);
-
-        if (rawT < 1) {
-          playbackRAF = requestAnimationFrame(frame);
-        } else {
-          setTimeout(resolve, holdTime);
+          playPaths[i] = merged;
         }
       }
-      playbackRAF = requestAnimationFrame(frame);
-    });
 
-    base = endPos;
+      await new Promise(resolve => {
+        const startTime = performance.now();
+        function frame(now) {
+          const rawT = Math.min(1, (now - startTime) / duration);
+          const t = easeInOut(rawT);
+
+          ctx.clearRect(0, 0, rect.width, rect.height);
+          ctx.drawImage(courtImg, 0, 0, rect.width, rect.height);
+          drawPlaybackTrails(ctx, s);
+
+          for (let i = 0; i < PIECE_COUNT; i++) {
+            const pts = playPaths[i];
+            let pos;
+            if (pts && pts.length >= 2) {
+              pos = interpolatePath(pts, t);
+            } else {
+              pos = startPos[i];
+            }
+            drawPieceOnCanvas(ctx, pos.x, pos.y, TYPES[i], LABELS[i]);
+          }
+          drawAnnotationOnCanvas(ctx, step.annotation, rect.width, rect.height);
+
+          if (rawT < 1) {
+            playbackRAF = requestAnimationFrame(frame);
+          } else {
+            setTimeout(resolve, holdTime);
+          }
+        }
+        playbackRAF = requestAnimationFrame(frame);
+      });
+
+      base = endPos;
+    }
+
+    if (recorder) {
+      recorder.stop();
+      await new Promise((resolve, reject) => {
+        recorder.onstop = resolve;
+        recorder.onerror = () => reject(new Error('录制失败'));
+      });
+
+      let blob = new Blob(chunks, { type: mimeType.includes('mp4') ? 'video/mp4' : 'video/webm' });
+      const isWebM = !mimeType.includes('mp4');
+
+      // 修复 WebM 时长元数据（VLC 等播放器需要完整的 Duration）
+      if (isWebM) {
+        const totalMs = Math.round(steps.length * (STEP_PLAY_MS + STEP_HOLD_MS) / playSpeed);
+        try {
+          await loadFixWebmDuration();
+          if (typeof window.ysFixWebmDuration === 'function') {
+            blob = await new Promise((res, rej) => {
+              window.ysFixWebmDuration(blob, totalMs, (fixedBlob) => res(fixedBlob));
+              setTimeout(() => rej(new Error('WebM 修复超时')), 10000);
+            });
+          }
+        } catch (e) {
+          console.warn('WebM 时长修复失败:', e);
+        }
+      }
+
+      const ext = isWebM ? '.webm' : '.mp4';
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'tactic_' + new Date().toISOString().slice(0,19).replace(/[:T]/g,'-') + ext;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+  } catch (err) {
+    console.error('播放/录制错误:', err);
+    if (err.name === 'SecurityError' || err.message.toLowerCase().includes('insecure')) {
+      alert('录制失败：浏览器安全策略限制。\n如果通过本地文件(file://)打开，请通过 HTTP 服务器访问（如 python -m http.server 或 npx serve），或换用 Chrome/Edge/Safari 浏览器。');
+    } else {
+      alert('播放失败: ' + err.message);
+    }
+  } finally {
+    if (playbackRAF) cancelAnimationFrame(playbackRAF);
+    canvas.style.display = 'none';
+    trailLayer.style.display = 'block';
+    court.querySelectorAll('.piece').forEach(el => el.style.display = 'flex');
+    isPlaying = false;
+    updateUI();
   }
-
-  if (recorder) {
-    recorder.stop();
-    await new Promise((resolve, reject) => {
-      recorder.onstop = resolve;
-      recorder.onerror = () => reject(new Error('录制失败'));
-    });
-    const blob = new Blob(chunks, { type: 'video/webm' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'tactic_' + new Date().toISOString().slice(0,19).replace(/[:T]/g,'-') + '.webm';
-    a.click();
-    URL.revokeObjectURL(url);
-  }
-
-  canvas.style.display = 'none';
-  trailLayer.style.display = 'block';
-  court.querySelectorAll('.piece').forEach(el => el.style.display = 'flex');
-
-  isPlaying = false;
-  updateUI();
 }
 
 // ==================== 保存/加载 ====================
