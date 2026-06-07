@@ -1111,9 +1111,9 @@ async function loadFfmpeg() {
       console.log('[ffmpeg]', message);
     });
 
-    // 使用本地 ffmpeg core 文件（支持 GitHub Pages 子目录）
-    const coreURL = './ffmpeg/ffmpeg-core.js';
-    const wasmURL = './ffmpeg/ffmpeg-core.wasm';
+    // 使用本地 ffmpeg core 文件（相对于 ffmpeg.js 的 publicPath）
+    const coreURL = './ffmpeg-core.js';
+    const wasmURL = './ffmpeg-core.wasm';
 
     await ffmpeg.load({ coreURL, wasmURL });
 
