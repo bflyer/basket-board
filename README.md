@@ -1,5 +1,7 @@
 # 🏀 篮球战术板
 
+**🔗 在线使用：[https://bflyer.github.io/basket-board/](https://bflyer.github.io/basket-board/)**
+
 一个纯前端实现的交互式篮球战术板，支持球员拖动、多步骤战术编排、轨迹记录、动画播放、视频导出和历史记录存取。
 
 ![Basketball Tactics Board](basketball_court.png)
