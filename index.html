@@ -736,9 +736,16 @@ async function loadFixWebmDuration() {
   if (typeof window.ysFixWebmDuration === 'function') return;
   return new Promise((resolve, reject) => {
     const script = document.createElement('script');
-    script.src = 'fix-webm-duration.js';
     script.onload = resolve;
-    script.onerror = () => reject(new Error('无法加载 WebM 修复库'));
+    script.onerror = () => {
+      // 本地不存在，回退 CDN
+      const cdn = document.createElement('script');
+      cdn.src = 'https://unpkg.com/fix-webm-duration@1.0.5/fix-webm-duration.js';
+      cdn.onload = resolve;
+      cdn.onerror = () => reject(new Error('无法加载 WebM 修复库'));
+      document.head.appendChild(cdn);
+    };
+    script.src = 'fix-webm-duration.js';
     document.head.appendChild(script);
   });
 }
@@ -1096,22 +1103,48 @@ async function loadFfmpeg() {
   const overlay = createProgressOverlay('📦 正在加载视频编码器', '首次使用约需加载 25MB，请稍候…');
 
   try {
-    const FFmpeg = FFmpegWASM.FFmpeg;
+    // 优先使用本地文件（www/ 目录），否则从 CDN 加载
+    let FFmpeg;
+    if (typeof FFmpegWASM !== 'undefined') {
+      FFmpeg = FFmpegWASM.FFmpeg;
+    } else {
+      await new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = 'https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js';
+        script.onload = resolve;
+        script.onerror = reject;
+        document.head.appendChild(script);
+      });
+      FFmpeg = FFmpegWASM.FFmpeg;
+    }
+
     const ffmpeg = new FFmpeg();
     ffmpeg.on('log', ({ message }) => {
       console.log('[ffmpeg]', message);
     });
 
-    await ffmpeg.load({
-      coreURL: window.location.origin + '/ffmpeg/ffmpeg-core.js',
-      wasmURL: window.location.origin + '/ffmpeg/ffmpeg-core.wasm'
-    });
+    // 检测本地 core 文件是否存在
+    let coreURL, wasmURL;
+    try {
+      const localCoreRes = await fetch(window.location.origin + '/ffmpeg/ffmpeg-core.js', { method: 'HEAD' });
+      if (localCoreRes.ok) {
+        coreURL = window.location.origin + '/ffmpeg/ffmpeg-core.js';
+        wasmURL = window.location.origin + '/ffmpeg/ffmpeg-core.wasm';
+      } else {
+        throw new Error('local not found');
+      }
+    } catch (e) {
+      coreURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.js';
+      wasmURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.wasm';
+    }
+
+    await ffmpeg.load({ coreURL, wasmURL });
 
     ffmpegInstance = { ffmpeg, fetchFile };
     return ffmpegInstance;
   } catch (e) {
     console.error('ffmpeg 加载失败:', e);
-    alert('视频编码器加载失败。\n错误: ' + e.message);
+    alert('视频编码器加载失败，请检查网络连接。\n错误: ' + e.message);
     throw e;
   } finally {
     ffmpegLoading = false;
