@@ -1,8 +1,7 @@
 {
   "appId": "com.example.basketballtactics",
   "appName": "篮球战术板",
-  "webDir": ".",
-  "bundledWebRuntime": false,
+  "webDir": "www",
   "server": {
     "androidScheme": "https"
   }

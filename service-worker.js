@@ -21,6 +21,11 @@ self.addEventListener('activate', event => {
 });
 
 self.addEventListener('fetch', event => {
+  const url = new URL(event.request.url);
+  // ffmpeg 目录下的文件不经过 Service Worker 缓存，避免 wasm 加载问题
+  if (url.pathname.startsWith('/ffmpeg/')) {
+    return;
+  }
   event.respondWith(
     caches.match(event.request).then(response => {
       if (response) return response;

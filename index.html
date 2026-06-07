@@ -8,7 +8,9 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" type="image/png" href="icon-192.png">
 <title>篮球战术板</title>
+<script src="ffmpeg/ffmpeg.js"></script>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body {
@@ -734,7 +736,7 @@ async function loadFixWebmDuration() {
   if (typeof window.ysFixWebmDuration === 'function') return;
   return new Promise((resolve, reject) => {
     const script = document.createElement('script');
-    script.src = 'https://unpkg.com/fix-webm-duration@1.0.5/fixwebmduration.js';
+    script.src = 'fix-webm-duration.js';
     script.onload = resolve;
     script.onerror = () => reject(new Error('无法加载 WebM 修复库'));
     document.head.appendChild(script);
@@ -778,14 +780,12 @@ async function playAll(shouldRecord = false) {
       });
     }
 
-    // 编码选择：Safari 支持 mp4，Chrome/Edge/Firefox 优先 vp8（兼容性最好）
+    // 编码选择：Safari 用 MP4(H.264)，其他浏览器用 WebM VP8（兼容性最好）
     let mimeType = null;
-    const candidates = [
-      'video/mp4',
-      'video/webm; codecs=vp8',
-      'video/webm; codecs=vp9',
-      'video/webm'
-    ];
+    const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+    const candidates = isSafari
+      ? ['video/mp4', 'video/webm; codecs=vp8', 'video/webm']
+      : ['video/webm; codecs=vp8', 'video/webm; codecs=vp9', 'video/webm', 'video/mp4'];
     for (const type of candidates) {
       if (MediaRecorder.isTypeSupported(type)) {
         mimeType = type;
@@ -899,12 +899,24 @@ async function playAll(shouldRecord = false) {
       }
 
       const ext = isWebM ? '.webm' : '.mp4';
+      const baseName = 'tactic_' + new Date().toISOString().slice(0,19).replace(/[:T]/g,'-');
+
+      // 先下载原始格式
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = 'tactic_' + new Date().toISOString().slice(0,19).replace(/[:T]/g,'-') + ext;
+      a.download = baseName + ext;
       a.click();
       URL.revokeObjectURL(url);
+
+      // 如果是 WebM，显示转码提示条
+      console.log('[录制] mimeType=', mimeType, 'isWebM=', isWebM);
+      if (isWebM) {
+        console.log('[录制] 显示转码提示条');
+        showTranscodePrompt(blob, baseName + '.mp4');
+      } else {
+        console.log('[录制] 是 MP4，不显示转码提示');
+      }
     }
   } catch (err) {
     console.error('播放/录制错误:', err);
@@ -985,6 +997,181 @@ window.addEventListener('resize', () => {
 
 // ==================== 启动 ====================
 init();
+
+// ==================== 转码提示条 ====================
+function showTranscodePrompt(webmBlob, mp4Filename) {
+  console.log('[转码提示] showTranscodePrompt 被调用');
+  // 移除旧的提示条
+  const old = document.getElementById('transcode-prompt');
+  if (old) old.remove();
+
+  const div = document.createElement('div');
+  div.id = 'transcode-prompt';
+  div.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#222;color:#fff;padding:14px 20px;border-radius:8px;font-family:sans-serif;font-size:14px;z-index:9998;display:flex;align-items:center;gap:14px;box-shadow:0 4px 20px rgba(0,0,0,0.4);max-width:90%;flex-wrap:wrap;';
+  div.innerHTML = `
+    <span>📹 已保存 WebM（电脑可播放）</span>
+    <button id="transcode-btn" style="padding:6px 14px;background:#4CAF50;border:none;color:#fff;border-radius:4px;cursor:pointer;font-size:13px;white-space:nowrap;">📱 转码为手机 MP4</button>
+    <button id="transcode-dismiss" style="padding:6px 10px;background:rgba(255,255,255,0.15);border:none;color:#fff;border-radius:4px;cursor:pointer;font-size:13px;">忽略</button>
+  `;
+  document.body.appendChild(div);
+
+  div.querySelector('#transcode-btn').onclick = () => {
+    div.remove();
+    transcodeWebmToMp4(webmBlob, mp4Filename);
+  };
+  div.querySelector('#transcode-dismiss').onclick = () => {
+    div.remove();
+  };
+
+  // 10 秒后自动消失
+  setTimeout(() => {
+    if (document.getElementById('transcode-prompt') === div) {
+      div.style.transition = 'opacity 0.5s';
+      div.style.opacity = '0';
+      setTimeout(() => div.remove(), 500);
+    }
+  }, 10000);
+}
+
+// ==================== ffmpeg.wasm 转码 ====================
+let ffmpegInstance = null;
+let ffmpegLoading = false;
+
+function createProgressOverlay(title, subtitle) {
+  const div = document.createElement('div');
+  div.id = 'ffmpeg-progress-overlay';
+  div.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.75);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;color:white;font-family:sans-serif;';
+  div.innerHTML = `
+    <div style="font-size:20px;margin-bottom:10px;font-weight:bold;">${title}</div>
+    <div style="font-size:14px;opacity:0.85;margin-bottom:24px;max-width:300px;text-align:center;">${subtitle}</div>
+    <div style="width:260px;height:6px;background:rgba(255,255,255,0.2);border-radius:3px;overflow:hidden;">
+      <div id="ffmpeg-progress-bar" style="width:0%;height:100%;background:#4CAF50;border-radius:3px;transition:width 0.3s;"></div>
+    </div>
+    <div id="ffmpeg-progress-text" style="margin-top:12px;font-size:13px;opacity:0.7;">0%</div>
+    <button id="ffmpeg-cancel-btn" style="margin-top:24px;padding:8px 20px;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);color:white;border-radius:4px;cursor:pointer;font-size:13px;">取消</button>
+  `;
+  document.body.appendChild(div);
+
+  let cancelled = false;
+  div.querySelector('#ffmpeg-cancel-btn').onclick = () => {
+    cancelled = true;
+    div.remove();
+  };
+
+  return {
+    setProgress(pct) {
+      const bar = div.querySelector('#ffmpeg-progress-bar');
+      const text = div.querySelector('#ffmpeg-progress-text');
+      if (bar) bar.style.width = pct + '%';
+      if (text) text.textContent = pct + '%';
+    },
+    setText(txt) {
+      const text = div.querySelector('#ffmpeg-progress-text');
+      if (text) text.textContent = txt;
+    },
+    remove() { div.remove(); },
+    get cancelled() { return cancelled; }
+  };
+}
+
+// 替代 @ffmpeg/util 的 fetchFile（把 Blob/URL 转成 Uint8Array）
+async function fetchFile(file) {
+  if (file instanceof Blob) {
+    const buf = await file.arrayBuffer();
+    return new Uint8Array(buf);
+  }
+  const res = await fetch(file);
+  const buf = await res.arrayBuffer();
+  return new Uint8Array(buf);
+}
+
+async function loadFfmpeg() {
+  if (ffmpegInstance) return ffmpegInstance;
+  if (ffmpegLoading) {
+    while (ffmpegLoading) await new Promise(r => setTimeout(r, 200));
+    return ffmpegInstance;
+  }
+
+  ffmpegLoading = true;
+  const overlay = createProgressOverlay('📦 正在加载视频编码器', '首次使用约需加载 25MB，请稍候…');
+
+  try {
+    const FFmpeg = FFmpegWASM.FFmpeg;
+    const ffmpeg = new FFmpeg();
+    ffmpeg.on('log', ({ message }) => {
+      console.log('[ffmpeg]', message);
+    });
+
+    await ffmpeg.load({
+      coreURL: window.location.origin + '/ffmpeg/ffmpeg-core.js',
+      wasmURL: window.location.origin + '/ffmpeg/ffmpeg-core.wasm'
+    });
+
+    ffmpegInstance = { ffmpeg, fetchFile };
+    return ffmpegInstance;
+  } catch (e) {
+    console.error('ffmpeg 加载失败:', e);
+    alert('视频编码器加载失败。\n错误: ' + e.message);
+    throw e;
+  } finally {
+    ffmpegLoading = false;
+    overlay.remove();
+  }
+}
+
+async function transcodeWebmToMp4(webmBlob, filename) {
+  const overlay = createProgressOverlay('🎬 正在转码为 MP4', '请稍候，正在转换为手机兼容格式…');
+
+  try {
+    const { ffmpeg, fetchFile } = await loadFfmpeg();
+    if (overlay.cancelled) return;
+
+    overlay.setText('正在写入视频数据…');
+    await ffmpeg.writeFile('input.webm', await fetchFile(webmBlob));
+
+    ffmpeg.on('progress', ({ progress }) => {
+      const pct = Math.round(Math.min(100, Math.max(0, progress * 100)));
+      overlay.setProgress(pct);
+      overlay.setText(`转码中… ${pct}%`);
+    });
+
+    overlay.setText('开始转码…');
+    await ffmpeg.exec([
+      '-i', 'input.webm',
+      '-c:v', 'libx264',
+      '-preset', 'fast',
+      '-crf', '23',
+      '-pix_fmt', 'yuv420p',
+      '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2',
+      '-movflags', '+faststart',
+      '-an',
+      '-y',
+      'output.mp4'
+    ]);
+
+    overlay.setText('正在生成文件…');
+    const data = await ffmpeg.readFile('output.mp4');
+    const mp4Blob = new Blob([data.buffer], { type: 'video/mp4' });
+
+    // 清理临时文件
+    await ffmpeg.deleteFile('input.webm');
+    await ffmpeg.deleteFile('output.mp4');
+
+    const url = URL.createObjectURL(mp4Blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+
+    overlay.remove();
+    alert('✅ MP4 转码完成！文件已下载，可直接在手机播放。');
+  } catch (e) {
+    overlay.remove();
+    console.error('转码失败:', e);
+    alert('转码失败: ' + e.message);
+  }
+}
 
 // 注册 Service Worker（PWA 离线支持）
 if ('serviceWorker' in navigator) {
