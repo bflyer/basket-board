@@ -339,6 +339,7 @@ h1 { margin-bottom: 8px; font-size: 22px; }
   <span class="step-info" id="step-info">初始摆放</span>
   <button id="btn-finish" class="primary" onclick="finishStep()">✅ 完成步骤</button>
   <button id="btn-play" onclick="togglePlayback()">▶ 播放全部</button>
+  <button id="btn-play-step" onclick="toggleStepPlayback()">⏭ 逐步播放：第 1 步</button>
   <label class="speed-label">
     速度
     <input type="range" id="speed-slider" min="0.25" max="1" step="0.25" value="0.5" oninput="updateSpeed(this.value)">
@@ -431,6 +432,8 @@ let playbackRAF = null;
 let playbackWaitResolve = null;
 let playbackStopRequested = false;
 let isRecordingPlayback = false;
+let playbackMode = null;
+let stepPlaybackCursor = 0;
 let playSpeed = 0.5;
 let currentLocalTacticId = null;
 let presetTactics = [];
@@ -448,6 +451,7 @@ const annoInput = document.getElementById('annotation-text');
 annoInput.addEventListener('input', function() {
   if (currentStep >= 0 && steps[currentStep]) {
     steps[currentStep].annotation = this.value;
+    stepPlaybackCursor = 0;
   }
 });
 
@@ -483,6 +487,8 @@ function init() {
   playbackWaitResolve = null;
   playbackStopRequested = false;
   isRecordingPlayback = false;
+  playbackMode = null;
+  stepPlaybackCursor = 0;
   renderPieces();
   updateUI();
 }
@@ -658,6 +664,7 @@ function onUp(e) {
       if (!steps[currentStep]) steps[currentStep] = { moves: [], annotation: '' };
       steps[currentStep].moves.push(activeMove);
     }
+    stepPlaybackCursor = 0;
   }
   dragIdx = -1;
   activeMove = null;
@@ -674,6 +681,7 @@ function updateUI() {
   const btnResetStep = document.getElementById('btn-reset-step');
   const btnFinish = document.getElementById('btn-finish');
   const btnPlay = document.getElementById('btn-play');
+  const btnPlayStep = document.getElementById('btn-play-step');
   const btnRecord = document.getElementById('btn-record');
   const btnResetAll = document.getElementById('btn-reset-all');
   const btnLibrary = document.getElementById('btn-library');
@@ -681,10 +689,17 @@ function updateUI() {
 
   if (isPlaying) {
     stepInfo.textContent = isRecordingPlayback ? '录制中…' : '播放中…';
-    [btnPrev, btnUndo, btnResetStep, btnFinish, btnRecord, btnResetAll, btnLibrary].forEach(b => b.disabled = true);
-    btnPlay.disabled = false;
-    btnPlay.textContent = '⏹ 停止播放';
-    btnPlay.classList.add('warn');
+    [btnPrev, btnUndo, btnResetStep, btnFinish, btnPlay, btnPlayStep, btnRecord, btnResetAll, btnLibrary]
+      .forEach(b => b.disabled = true);
+    if (playbackMode === 'step') {
+      btnPlayStep.disabled = false;
+      btnPlayStep.textContent = '⏹ 停止播放';
+      btnPlayStep.classList.add('warn');
+    } else {
+      btnPlay.disabled = false;
+      btnPlay.textContent = '⏹ 停止播放';
+      btnPlay.classList.add('warn');
+    }
     slider.disabled = false;
     annoInput.disabled = true;
     return;
@@ -696,6 +711,12 @@ function updateUI() {
   btnPlay.disabled = playableStepCount < 1;
   btnPlay.textContent = '▶ 播放全部';
   btnPlay.classList.remove('warn');
+  if (stepPlaybackCursor >= playableStepCount) stepPlaybackCursor = 0;
+  btnPlayStep.disabled = playableStepCount < 1;
+  btnPlayStep.textContent = playableStepCount > 0
+    ? `⏭ 逐步播放：第 ${stepPlaybackCursor + 1} 步`
+    : '⏭ 逐步播放';
+  btnPlayStep.classList.remove('warn');
   btnRecord.disabled = playableStepCount < 1 || isFileProtocol;
   btnRecord.title = (isFileProtocol && playableStepCount >= 1)
     ? '通过本地文件(file://)打开时无法录制视频，请通过 HTTP 服务器访问（如 python3 -m http.server）'
@@ -739,6 +760,7 @@ function finishStep() {
     steps.push({ moves: [], annotation: '' });
     currentStep++;
   }
+  stepPlaybackCursor = 0;
   renderPieces();
   updateUI();
 }
@@ -746,6 +768,7 @@ function finishStep() {
 function goPrev() {
   if (isPlaying || activeMove || currentStep < 0) return;
   currentStep--;
+  stepPlaybackCursor = Math.max(0, currentStep);
   renderPieces();
   updateUI();
 }
@@ -756,12 +779,14 @@ function undoMove() {
   if (activeMove) {
     activeMove = null;
     dragIdx = -1;
+    stepPlaybackCursor = 0;
     renderPieces();
     updateUI();
     return;
   }
   if (currentStep >= 0 && steps[currentStep] && steps[currentStep].moves.length) {
     steps[currentStep].moves.pop();
+    stepPlaybackCursor = 0;
     renderPieces();
     updateUI();
   }
@@ -772,6 +797,7 @@ function resetStep() {
   if (currentStep < 0) return;
   if (!confirm('确定重置当前步骤的所有拖动吗？')) return;
   steps[currentStep] = { moves: [], annotation: steps[currentStep].annotation || '' };
+  stepPlaybackCursor = 0;
   renderPieces();
   updateUI();
 }
@@ -968,6 +994,17 @@ function togglePlayback() {
   else playAll(false);
 }
 
+function toggleStepPlayback() {
+  if (isPlaying) {
+    stopPlayback();
+    return;
+  }
+  const playbackSteps = getPlaybackSteps();
+  if (!playbackSteps.length) return;
+  if (stepPlaybackCursor >= playbackSteps.length) stepPlaybackCursor = 0;
+  playAll(false, stepPlaybackCursor);
+}
+
 function stopPlayback() {
   if (!isPlaying || playbackStopRequested) return;
   playbackStopRequested = true;
@@ -1013,11 +1050,16 @@ function runPlaybackSegment(baseDurationMs, onProgress) {
   });
 }
 
-async function playAll(shouldRecord = false) {
+async function playAll(shouldRecord = false, singleStepIndex = null) {
   const playbackSteps = getPlaybackSteps();
   if (isPlaying || playbackSteps.length < 1) return;
+  const isSingleStep = Number.isInteger(singleStepIndex);
+  if (isSingleStep && (singleStepIndex < 0 || singleStepIndex >= playbackSteps.length)) return;
+  const firstPlaybackStep = isSingleStep ? singleStepIndex : 0;
+  const lastPlaybackStep = isSingleStep ? singleStepIndex + 1 : playbackSteps.length;
   isPlaying = true;
   isRecordingPlayback = shouldRecord;
+  playbackMode = isSingleStep ? 'step' : (shouldRecord ? 'record' : 'all');
   playbackStopRequested = false;
   updateUI();
 
@@ -1095,7 +1137,10 @@ async function playAll(shouldRecord = false) {
     }
 
     let base = clonePositions(setupPositions);
-    for (let s = 0; s < playbackSteps.length && !playbackStopRequested; s++) {
+    for (let s = 0; s < firstPlaybackStep; s++) {
+      base = applyStepMoves(base, playbackSteps[s]);
+    }
+    for (let s = firstPlaybackStep; s < lastPlaybackStep && !playbackStopRequested; s++) {
       stepInfo.textContent = `${isRecordingPlayback ? '录制' : '播放'}步骤 ${s + 1} / ${playbackSteps.length}`;
       const step = playbackSteps[s];
       const startPos = clonePositions(base);
@@ -1148,10 +1193,15 @@ async function playAll(shouldRecord = false) {
       if (!stepCompleted) break;
 
       base = endPos;
-      if (s < playbackSteps.length - 1) {
+      if (!isSingleStep && s < lastPlaybackStep - 1) {
         const holdCompleted = await runPlaybackSegment(STEP_HOLD_MS, () => {});
         if (!holdCompleted) break;
       }
+    }
+
+    if (isSingleStep && !playbackStopRequested) {
+      currentStep = firstPlaybackStep;
+      stepPlaybackCursor = lastPlaybackStep >= playbackSteps.length ? 0 : lastPlaybackStep;
     }
 
     if (recorder) {
@@ -1218,6 +1268,8 @@ async function playAll(shouldRecord = false) {
     isPlaying = false;
     isRecordingPlayback = false;
     playbackStopRequested = false;
+    playbackMode = null;
+    renderPieces();
     updateUI();
   }
 }
@@ -1418,6 +1470,8 @@ function finishApplyingTactic() {
   activeMove = null;
   dragIdx = -1;
   isPlaying = false;
+  playbackMode = null;
+  stepPlaybackCursor = 0;
   if (playbackRAF) cancelAnimationFrame(playbackRAF);
   renderPieces();
   updateUI();

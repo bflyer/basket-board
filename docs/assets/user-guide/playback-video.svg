@@ -5,7 +5,7 @@
   <rect x="55" y="85" width="520" height="470" rx="14" fill="#1a1a2e" stroke="#334155" stroke-width="2"/><text x="85" y="125" class="h">播放过程中</text>
   <rect x="90" y="150" width="160" height="45" rx="7" fill="#d97706"/><text x="170" y="179" text-anchor="middle" class="t" font-size="17">⏹ 停止播放</text>
   <rect x="270" y="150" width="260" height="45" rx="7" fill="#16213e"/><text x="288" y="178" class="t">速度</text><line x1="345" y1="172" x2="455" y2="172" stroke="#94a3b8" stroke-width="5"/><circle cx="400" cy="172" r="9" fill="#e94560"/><text x="474" y="178" class="t">0.5x</text>
-  <text x="90" y="225" class="t">• 点击停止可立即中断当前移动或步骤间停顿。</text><text x="90" y="255" class="t">• 拖动速度滑块，下一帧立刻按新速度继续。</text><text x="90" y="285" class="t">• 可选 0.25x、0.5x、0.75x、1x。</text>
+  <text x="90" y="215" class="t">• “播放全部”连续播放；“逐步播放”每次只播放一步。</text><text x="90" y="245" class="t">• 点击停止可立即中断当前移动或步骤间停顿。</text><text x="90" y="275" class="t">• 播放时可实时选择 0.25x、0.5x、0.75x、1x。</text>
   <rect x="90" y="320" width="440" height="170" rx="8" fill="#c98d50" stroke="#fff" stroke-width="3"/><line x1="310" y1="320" x2="310" y2="490" stroke="#fff" stroke-width="2"/><circle cx="310" cy="405" r="35" fill="none" stroke="#fff" stroke-width="2"/><circle cx="180" cy="405" r="18" fill="#e63946" stroke="#fff" stroke-width="2"/><path d="M180 405C245 350 340 355 410 395" fill="none" stroke="#e63946" stroke-width="5" stroke-dasharray="8 6" marker-end="url(#a)"/><circle cx="250" cy="420" r="13" fill="#fb8500" stroke="#fff" stroke-width="2"/>
   <rect x="90" y="505" width="440" height="34" rx="6" fill="#16213e"/><text x="310" y="528" text-anchor="middle" class="t">播放步骤 2 / 3　“4号顺下，1号观察协防”</text>
 
