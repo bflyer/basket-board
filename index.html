@@ -238,7 +238,7 @@ const PIECE_COUNT = 11;
 const LABELS = ['1','2','3','4','5','1','2','3','4','5','球'];
 const TYPES = ['red','red','red','red','red','yellow','yellow','yellow','yellow','yellow','ball'];
 const TRAIL_COLORS = ['#e63946','#e63946','#e63946','#e63946','#e63946','#f4a261','#f4a261','#f4a261','#f4a261','#f4a261','#fb8500'];
-const STEP_PLAY_MS = 2000; // 基础时长，默认0.5x即实际1秒
+const STEP_PLAY_MS = 2000; // 1x 时每步 2 秒，较低速度会按比例延长
 const STEP_HOLD_MS = 400;
 
 // ==================== 状态 ====================
@@ -315,6 +315,19 @@ function applyStepMoves(base, step) {
   return pos;
 }
 
+function hasStepContent(step) {
+  return Boolean(step && (
+    (Array.isArray(step.moves) && step.moves.length > 0) ||
+    (typeof step.annotation === 'string' && step.annotation.trim())
+  ));
+}
+
+function getPlaybackSteps() {
+  let end = steps.length;
+  while (end > 0 && !hasStepContent(steps[end - 1])) end--;
+  return steps.slice(0, end);
+}
+
 function getDisplayPositions() {
   let pos = getBasePositions();
   if (currentStep >= 0 && steps[currentStep]) {
@@ -346,7 +359,6 @@ function renderPieces() {
 function drawTrails() {
   trailLayer.innerHTML = '';
   if (currentStep < 0) return;
-  let base = clonePositions(setupPositions);
   for (let s = 0; s < steps.length; s++) {
     const step = steps[s];
     if (!step || !step.moves) continue;
@@ -356,7 +368,6 @@ function drawTrails() {
     for (const move of step.moves) {
       drawPath(move.points, TRAIL_COLORS[move.pieceIndex], isPast ? 0.35 : 1.0);
     }
-    base = applyStepMoves(base, step);
   }
   if (activeMove && activeMove.points.length > 1) {
     drawPath(activeMove.points, TRAIL_COLORS[activeMove.pieceIndex], 1.0, true);
@@ -462,6 +473,7 @@ function onUp(e) {
 // ==================== 步骤控制 ====================
 function updateUI() {
   const totalSteps = steps.length;
+  const playableStepCount = getPlaybackSteps().length;
   const btnPrev = document.getElementById('btn-prev');
   const btnUndo = document.getElementById('btn-undo');
   const btnResetStep = document.getElementById('btn-reset-step');
@@ -480,9 +492,9 @@ function updateUI() {
 
   const isFileProtocol = window.location.protocol === 'file:';
   btnResetAll.disabled = false;
-  btnPlay.disabled = totalSteps < 1;
-  btnRecord.disabled = totalSteps < 1 || isFileProtocol;
-  btnRecord.title = (isFileProtocol && totalSteps >= 1)
+  btnPlay.disabled = playableStepCount < 1;
+  btnRecord.disabled = playableStepCount < 1 || isFileProtocol;
+  btnRecord.title = (isFileProtocol && playableStepCount >= 1)
     ? '通过本地文件(file://)打开时无法录制视频，请通过 HTTP 服务器访问（如 python3 -m http.server）'
     : '';
   slider.disabled = false;
@@ -628,10 +640,9 @@ function drawTrailOnCanvas(ctx, points, color, alpha) {
   ctx.restore();
 }
 
-function drawPlaybackTrails(ctx, currentS) {
-  let base = clonePositions(setupPositions);
-  for (let s = 0; s < steps.length; s++) {
-    const step = steps[s];
+function drawPlaybackTrails(ctx, currentS, playbackSteps) {
+  for (let s = 0; s < playbackSteps.length; s++) {
+    const step = playbackSteps[s];
     if (!step || !step.moves) continue;
     let alpha;
     if (s < currentS) alpha = 0.25;
@@ -640,7 +651,6 @@ function drawPlaybackTrails(ctx, currentS) {
     for (const move of step.moves) {
       drawTrailOnCanvas(ctx, move.points, TRAIL_COLORS[move.pieceIndex], alpha);
     }
-    base = applyStepMoves(base, step);
   }
 }
 
@@ -751,7 +761,8 @@ async function loadFixWebmDuration() {
 }
 
 async function playAll(shouldRecord = false) {
-  if (isPlaying || steps.length < 1) return;
+  const playbackSteps = getPlaybackSteps();
+  if (isPlaying || playbackSteps.length < 1) return;
   isPlaying = true;
   updateUI();
 
@@ -787,38 +798,49 @@ async function playAll(shouldRecord = false) {
       });
     }
 
-    // 编码选择：Safari 用 MP4(H.264)，其他浏览器用 WebM VP8（兼容性最好）
     let mimeType = null;
-    const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-    const candidates = isSafari
-      ? ['video/mp4', 'video/webm; codecs=vp8', 'video/webm']
-      : ['video/webm; codecs=vp8', 'video/webm; codecs=vp9', 'video/webm', 'video/mp4'];
-    for (const type of candidates) {
-      if (MediaRecorder.isTypeSupported(type)) {
-        mimeType = type;
-        break;
+    if (shouldRecord) {
+      if (!window.MediaRecorder || typeof canvas.captureStream !== 'function') {
+        throw new Error('当前浏览器不支持视频录制，请使用最新版 Chrome、Edge、Firefox 或 Safari');
+      }
+
+      // 优先使用浏览器原生 MP4；不支持时回退到 WebM，并提供浏览器内转码。
+      const candidates = [
+        'video/mp4; codecs=avc1.42E01E',
+        'video/mp4',
+        'video/webm; codecs=vp8',
+        'video/webm; codecs=vp9',
+        'video/webm'
+      ];
+      for (const type of candidates) {
+        if (MediaRecorder.isTypeSupported(type)) {
+          mimeType = type;
+          break;
+        }
       }
     }
-    if (!mimeType) mimeType = 'video/webm';
 
     if (shouldRecord) {
       const stream = canvas.captureStream(30);
       try {
-        recorder = new MediaRecorder(stream, { mimeType });
+        recorder = mimeType
+          ? new MediaRecorder(stream, { mimeType })
+          : new MediaRecorder(stream);
       } catch (e) {
         recorder = new MediaRecorder(stream);
       }
+      mimeType = recorder.mimeType || mimeType || 'video/webm';
       recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
       recorder.start(100);
     }
 
     let base = clonePositions(setupPositions);
-    for (let s = 0; s < steps.length; s++) {
-      const step = steps[s];
+    for (let s = 0; s < playbackSteps.length; s++) {
+      const step = playbackSteps[s];
       const startPos = clonePositions(base);
       const endPos = applyStepMoves(base, step);
       const duration = STEP_PLAY_MS / playSpeed;
-      const holdTime = STEP_HOLD_MS / playSpeed;
+      const holdTime = s < playbackSteps.length - 1 ? STEP_HOLD_MS / playSpeed : 0;
 
       const playPaths = new Array(PIECE_COUNT).fill(null);
       if (step && step.moves) {
@@ -853,7 +875,7 @@ async function playAll(shouldRecord = false) {
 
           ctx.clearRect(0, 0, rect.width, rect.height);
           ctx.drawImage(courtImg, 0, 0, rect.width, rect.height);
-          drawPlaybackTrails(ctx, s);
+          drawPlaybackTrails(ctx, s, playbackSteps);
 
           for (let i = 0; i < PIECE_COUNT; i++) {
             const pts = playPaths[i];
@@ -869,8 +891,10 @@ async function playAll(shouldRecord = false) {
 
           if (rawT < 1) {
             playbackRAF = requestAnimationFrame(frame);
-          } else {
+          } else if (holdTime > 0) {
             setTimeout(resolve, holdTime);
+          } else {
+            resolve();
           }
         }
         playbackRAF = requestAnimationFrame(frame);
@@ -891,7 +915,10 @@ async function playAll(shouldRecord = false) {
 
       // 修复 WebM 时长元数据（VLC 等播放器需要完整的 Duration）
       if (isWebM) {
-        const totalMs = Math.round(steps.length * (STEP_PLAY_MS + STEP_HOLD_MS) / playSpeed);
+        const totalMs = Math.round(
+          (playbackSteps.length * STEP_PLAY_MS +
+            Math.max(0, playbackSteps.length - 1) * STEP_HOLD_MS) / playSpeed
+        );
         try {
           await loadFixWebmDuration();
           if (typeof window.ysFixWebmDuration === 'function') {
@@ -917,12 +944,8 @@ async function playAll(shouldRecord = false) {
       URL.revokeObjectURL(url);
 
       // 如果是 WebM，显示转码提示条
-      console.log('[录制] mimeType=', mimeType, 'isWebM=', isWebM);
       if (isWebM) {
-        console.log('[录制] 显示转码提示条');
         showTranscodePrompt(blob, baseName + '.mp4');
-      } else {
-        console.log('[录制] 是 MP4，不显示转码提示');
       }
     }
   } catch (err) {
@@ -1007,7 +1030,6 @@ init();
 
 // ==================== 转码提示条 ====================
 function showTranscodePrompt(webmBlob, mp4Filename) {
-  console.log('[转码提示] showTranscodePrompt 被调用');
   // 移除旧的提示条
   const old = document.getElementById('transcode-prompt');
   if (old) old.remove();

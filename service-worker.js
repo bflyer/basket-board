@@ -1,11 +1,16 @@
-const CACHE_NAME = 'basketball-tactics-v1';
+const CACHE_NAME = 'basketball-tactics-v2';
 const urlsToCache = [
   './',
   './index.html',
   './basketball_court.png',
   './manifest.json',
   './icon-192.png',
-  './icon-512.png'
+  './icon-512.png',
+  './fix-webm-duration.js',
+  './ffmpeg/ffmpeg.js',
+  './ffmpeg/814.ffmpeg.js',
+  './ffmpeg/ffmpeg-core.js',
+  './ffmpeg/ffmpeg-core.wasm'
 ];
 
 self.addEventListener('install', event => {
@@ -17,15 +22,18 @@ self.addEventListener('install', event => {
 });
 
 self.addEventListener('activate', event => {
-  event.waitUntil(self.clients.claim());
+  event.waitUntil(
+    caches.keys()
+      .then(names => Promise.all(
+        names.filter(name => name.startsWith('basketball-tactics-') && name !== CACHE_NAME)
+          .map(name => caches.delete(name))
+      ))
+      .then(() => self.clients.claim())
+  );
 });
 
 self.addEventListener('fetch', event => {
-  const url = new URL(event.request.url);
-  // ffmpeg 目录下的文件不经过 Service Worker 缓存，避免 wasm 加载问题
-  if (url.pathname.startsWith('/ffmpeg/')) {
-    return;
-  }
+  if (event.request.method !== 'GET') return;
   event.respondWith(
     caches.match(event.request).then(response => {
       if (response) return response;

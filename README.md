@@ -1,261 +1,113 @@
 # 🏀 篮球战术板
 
-**🔗 在线使用：[https://bflyer.github.io/basket-board/](https://bflyer.github.io/basket-board/)**
+在线地址：<https://bflyer.github.io/basket-board/>
 
-一个纯前端实现的交互式篮球战术板，支持球员拖动、多步骤战术编排、轨迹记录、动画播放、视频导出和历史记录存取。
+这是一个不需要后端的篮球战术板：浏览器负责编辑、回放、导入/导出 JSON 和录制视频。站点不上传或保存用户数据。
 
-![Basketball Tactics Board](basketball_court.png)
+## 功能
 
-## ✨ 功能特性
+- 5 名红队球员、5 名黄队球员和 1 个篮球
+- 初始站位、多步骤跑位、轨迹与步骤注释
+- 回放速度调节、撤销与分级重置
+- 战术 JSON 导入/导出
+- 浏览器视频录制；优先原生 MP4，不支持时保存 WebM 并可在浏览器内转为 H.264 MP4
+- PWA 安装和离线使用
+- Capacitor Android 工程，可打包为 APK
 
-- **球员与篮球**：5 名红队球员 + 5 名黄队球员 + 1 个篮球，均可拖动
-- **初始摆放阶段**：独立的初始站位设定，不产生轨迹
-- **多步骤战术**：可创建多个战术步骤，每个步骤内拖动多名球员/篮球
-- **轨迹记录**：完整记录拖动路径（曲线），带箭头指示
-- **三级重置**：撤销单次拖动 / 重置当前步骤 / 重置全部
-- **战术回放**：按步骤顺序播放动画，支持 0.25x ~ 1x 速度调节
-- **步骤注释**：每个步骤可添加文字注释，播放时同步显示
-- **保存视频**：导出战术动画为视频文件，支持浏览器内自动转码为手机兼容的 MP4
-- **历史记录**：保存/加载战术数据（JSON 格式）
-- **PWA 支持**：可安装到手机桌面，离线可用
+## 文件结构
 
----
-
-## 📖 使用说明
-
-### 1. 初始摆放
-
-打开页面后进入**初始摆放**阶段，拖动球员和篮球到起始位置，点击 **"✅ 完成初始摆放"**。
-
-### 2. 编排战术步骤
-
-- 在当前步骤中拖动球员/篮球，会自动记录移动轨迹
-- 点击 **"✅ 完成步骤"** 保存当前步骤并进入下一步
-- 点击 **"⬅ 上一步"** 可回到之前的步骤查看或修改
-- 在步骤注释框中输入文字，播放时会同步显示
-
-### 3. 播放与导出
-
-- **"▶ 播放全部"**：在页面内预览战术动画
-- **"📹 保存视频"**：导出战术动画为视频文件
-- **速度滑块**：调节播放速度（0.25x ~ 1x，默认 0.5x）
-
-### 4. 撤销与重置
-
-- **"↩ 撤销拖动"**：撤销最近一次拖动（或取消当前正在进行的拖动）
-- **"🔄 重置步骤"**：清空当前步骤的所有轨迹
-- **"🗑 重置全部"**：清空所有步骤，回到初始状态
-
-### 5. 保存/加载战术
-
-- **"💾 保存战术"**：将所有数据导出为 JSON 文件
-- **"📂 加载战术"**：导入之前保存的 JSON 文件，恢复完整战术
-
----
-
-## 🚀 三种使用方式
-
-### 方式一：在线访问（推荐分享）
-
-部署到 **GitHub Pages**，获得免费链接，无需买域名、无需租服务器。
-
-#### 部署步骤
-
-1. **创建 GitHub 仓库**
-   - 登录 [github.com](https://github.com)，新建仓库（如 `basketball-tactics`）
-   - 不要勾选 "Initialize this repository with a README"
-
-2. **推送代码**
-   ```bash
-   cd 你的项目文件夹
-   git init
-   git add .
-   git commit -m "init"
-   git branch -M main
-   git remote add origin https://github.com/你的用户名/basketball-tactics.git
-   git push -u origin main
-   ```
-
-3. **开启 GitHub Pages**
-   - 进入仓库 → Settings → Pages
-   - Source 选择 "Deploy from a branch"，Branch 选 `main` / `root`
-   - 保存后等待 1~2 分钟
-
-4. **获得链接**
-   ```
-   https://你的用户名.github.io/basketball-tactics/
-   ```
-   把链接发给朋友，对方点击就能用。
-
-### 方式二：安装到手机桌面（像 App 一样）
-
-本页面已支持 PWA（渐进式 Web 应用）。
-
-#### Android（Chrome / Edge）
-1. 用浏览器打开链接
-2. 点击菜单 → **"添加到主屏幕"**（或 **"安装应用"**）
-3. 手机桌面会出现篮球图标，点击全屏打开，体验与原生 App 一致
-
-#### iOS（Safari）
-1. 用 Safari 打开链接
-2. 点击底部分享按钮 → **"添加到主屏幕"**
-3. 桌面生成图标，支持离线使用
-
-> PWA 首次加载后会自动缓存所有资源，之后**无需网络也能打开**。
-
-### 方式三：打包成 APK（Android 安装包）
-
-> **为什么需要链接？**
-> 
-> PWA Builder 等在线工具需要读取你的网页内容才能打包。如果你**不想用链接、不想部署到网上**，那就只能在**本地构建 APK**（见方案 B）。
-
-#### 方案 A：PWA Builder（在线打包，需要链接）
-
-[PWA Builder](https://www.pwabuilder.com/) 是微软开发的一个在线工具，你把网页链接给它，它自动帮你生成 Android APK、iOS 安装包、Windows 应用等。本质上是给你的网页套一个原生壳子。
-
-1. 先按**方式一**部署到 GitHub Pages，获得链接
-2. 访问 [PWA Builder](https://www.pwabuilder.com/)
-3. 输入你的 GitHub Pages 链接，点击 "Start"
-4. 选择 **"Android"** → 下载 APK
-5. 把 APK 发给朋友直接安装
-
----
-
-## 📦 APK 本地打包教程（不需要链接）
-
-如果你**不想把网页放到网上**，可以用 Capacitor 在本地打包。所有网页文件都会被打包进 APK 里，完全离线运行，不需要任何网址。
-
-### 准备工作（只需做一次）
-
-1. **安装 Node.js**
-   - 访问 [nodejs.org](https://nodejs.org/)，下载 LTS 版本
-   - 安装包一路点击下一步即可
-
-2. **安装 Android Studio**
-   - 访问 [developer.android.com/studio](https://developer.android.com/studio)
-   - 下载并安装
-   - 第一次打开时让它自动下载 SDK（出现提示时点击 "OK" 或 "Next"）
-
-### 第一次构建 APK
-
-```bash
-# 进入项目目录
-cd 你的项目文件夹
-
-# 1. 安装依赖（package.json 已配置好）
-npm install
-
-# 2. 生成 Android 项目（只需要执行一次）
-npx cap add android
-
-# 3. 同步网页资源到 Android 项目
-npx cap sync
-
-# 4. 打开 Android Studio
-npx cap open android
-```
-
-在 Android Studio 中：
-1. 等待底部状态栏的 **Gradle 同步**完成（出现 "Sync finished"）
-2. 菜单栏选择 **Build → Build Bundle(s) / APK(s) → Build APK(s)**
-3. 生成的 APK 在 `android/app/build/outputs/apk/debug/app-debug.apk`
-
-把 `app-debug.apk` 发给朋友，直接安装即可。
-
-### 后续修改后重新打包
-
-如果你修改了 `index.html`、战术数据或其他文件，需要重新生成 APK：
-
-```bash
-# 同步更新后的文件
-npx cap sync
-
-# 重新构建 APK（不需要打开 Android Studio）
-cd android && ./gradlew assembleDebug
-```
-
-新的 APK 仍在 `android/app/build/outputs/apk/debug/app-debug.apk`。
-
-### npm install 出现警告怎么办？
-
-`npm install` 时可能会看到类似这样的提示：
-
-```
-npm WARN deprecated glob@9.3.5: Old versions of glob are not supported...
-2 high severity vulnerabilities
-```
-
-**这些可以忽略**。它们是 Capacitor 依赖的间接库的旧版本警告，不会影响你的战术板程序。如果介意，可以运行：
-
-```bash
-npm audit fix
-```
-
----
-
-## 🎥 视频导出说明
-
-| 浏览器 | 导出格式 | 手机兼容性 |
-|--------|----------|-----------|
-| Safari | MP4 | ✅ 直接播放 |
-| Chrome / Edge / Firefox | WebM (VP8) | ⚠️ 需转码或 VLC |
-
-- **WebM 格式**：可用 Chrome、Edge、VLC（3.0.20+）、PotPlayer 等播放器打开
-- **MP4 转码**：Chrome / Edge / Firefox 录制 WebM 后，页面会自动提示"📱 转码为手机 MP4"，点击即可在浏览器内完成 H.264 转码（首次约需加载 25MB 编码器）
-- **Safari 用户**：直接导出标准 H.264 MP4，无需转码，手机兼容性最好
-
----
-
-## ⚠️ 常见问题
-
-**Q：双击 HTML 文件打开时无法保存视频？**  
-A：浏览器禁止 `file://` 协议下的视频录制。请通过 HTTP 服务器或 GitHub Pages 打开。
-
-**Q：VLC 打不开导出的 WebM 视频？**  
-A：请升级 VLC 到 3.0.20 或更高版本。程序已使用 VP8 编码并修复了时长元数据。
-
-**Q：Chrome 录制的视频发到手机上不能播放？**  
-A：Chrome 录制的是 WebM 格式，部分手机自带播放器不支持。保存视频后页面底部会弹出"📱 转码为手机 MP4"按钮，点击即可自动转码为标准 H.264 MP4。
-
-**Q：iOS 上能安装吗？**  
-A：可以。Safari 打开链接 → 分享 → "添加到主屏幕"。iOS 上导出视频为 MP4 格式，兼容性最好。
-
-**Q：PWA 安装后还需要网络吗？**  
-A：首次打开需要联网加载资源，之后自动缓存，可离线使用。
-
----
-
-## 📁 文件结构
-
-```
+```text
 .
-├── index.html              # 主程序（单页应用）
-├── basketball_court.png    # 篮球场背景图
-├── manifest.json           # PWA 应用配置
-├── service-worker.js       # PWA 离线缓存
-├── icon-192.png            # PWA 图标 192x192
-├── icon-512.png            # PWA 图标 512x512
-├── package.json            # Node.js 依赖配置（Capacitor 打包用）
-├── capacitor.config.json   # Capacitor 打包配置
-├── ffmpeg/                 # ffmpeg.wasm 本地文件（浏览器内转码用）
-│   ├── ffmpeg.js
-│   ├── ffmpeg-core.js
-│   ├── ffmpeg-core.wasm
-│   └── 814.ffmpeg.js
-├── fix-webm-duration.js    # WebM 时长修复库
-└── README.md               # 本说明文件
+├── index.html                 # 页面、样式和业务代码
+├── basketball_court.png       # 球场背景
+├── manifest.json              # PWA 配置
+├── service-worker.js          # 离线缓存
+├── icon-192.png / icon-512.png
+├── fix-webm-duration.js       # WebM 时长修复
+├── ffmpeg/                    # 本地 ffmpeg.wasm（WebM → MP4）
+├── scripts/prepare-web.mjs    # 生成 Capacitor 使用的 www/
+├── capacitor.config.json
+├── android/                   # Android 原生工程
+└── package.json
 ```
 
-## 🛠 技术栈
+`node_modules/`、`www/`、Gradle 缓存、Android WebView 资源和 APK 都是可再生成文件，不应提交到 Git。
 
-- 纯 HTML / CSS / JavaScript
-- Canvas 2D 渲染（播放动画）
-- SVG 轨迹绘制（编辑模式）
-- MediaRecorder API（视频录制）
-- Service Worker（PWA 离线支持）
-- ffmpeg.wasm（浏览器内视频转码）
-- Capacitor（打包原生 APK）
+## 无域名上线（推荐）
 
-## 📄 开源协议
+项目是静态站点，可以直接用 GitHub Pages 的免费 `github.io` 地址，不需要购买域名或服务器，也不需要在访客电脑上安装 Node.js。
 
-MIT License
+1. 将仓库推送到 GitHub。
+2. 进入仓库的 **Settings → Pages**。
+3. Source 选择 **Deploy from a branch**。
+4. Branch 选择 `main`，目录选择 `/ (root)`，保存。
+5. 等待发布后访问 `https://<用户名>.github.io/<仓库名>/`。
+
+这个仓库的静态源文件已经位于根目录，发布网页前不需要运行 `npm install` 或构建命令。GitHub Pages 的 `github.io` 地址自带 HTTPS，PWA、Service Worker 和浏览器视频能力可直接使用。
+
+## 新电脑上的开发与部署
+
+### 只修改/发布网页
+
+安装 Git，然后：
+
+```bash
+git clone <仓库地址>
+cd basket-board
+```
+
+修改根目录静态文件，提交并推送即可。Pages 会自动重新发布。
+
+本地预览必须通过 HTTP 打开，不能直接双击 `index.html`：
+
+```bash
+python3 -m http.server 8080
+```
+
+然后访问 <http://localhost:8080/>。也可以使用任意 IDE 静态服务器。
+
+### 构建 Android APK
+
+网页发布不需要以下环境；只有打 APK 才需要：
+
+- Node.js 18 或更高版本
+- Android Studio（含 JDK）
+- Android SDK API 34
+
+第一次执行：
+
+```bash
+npm ci
+npm run sync
+npm run android
+```
+
+在 Android Studio 中等待 Gradle Sync，然后选择 **Build → Build Bundle(s) / APK(s) → Build APK(s)**。
+
+Linux/macOS 也可直接执行：
+
+```bash
+npm run build-apk
+```
+
+Debug APK 输出在 `android/app/build/outputs/apk/debug/app-debug.apk`。Android 工程已经存在，不要再运行 `npx cap add android`。
+
+每次修改网页源码后，先执行 `npm run sync`，再重新构建 APK。`sync` 会重新生成 `www/`，并复制完整的页面、WebM 修复库和 FFmpeg 编码器。
+
+## 视频与浏览器兼容性
+
+录制依赖 `canvas.captureStream()`、`MediaRecorder` 和浏览器支持的编码器：
+
+- 浏览器支持 H.264/MP4 录制时，直接下载 MP4。
+- 只支持 WebM 时，先下载已修复时长的 WebM；页面随后提供“转码为手机 MP4”，使用仓库内约 32 MB 的 ffmpeg.wasm 转为 H.264/yuv420p MP4。
+- FFmpeg、WebM 修复库和页面资源会被 PWA 缓存；首次完整加载后可离线使用和转码。
+- 最新版 Chrome、Edge、Firefox 和 Safari 覆盖面较好，但无法承诺“任意浏览器”：旧浏览器、内嵌微信浏览器、部分 iOS/Android WebView 可能缺少录制、Worker、WebAssembly 或下载能力。
+- 视频跨播放器兼容也不是绝对保证。最稳妥的交付格式是页面直接生成或转码后的 MP4，而不是原始 WebM。
+
+直接以 `file://` 打开时，项目会禁用视频录制。线上应使用 HTTPS；本地开发使用 `localhost`。
+
+## 数据与运维边界
+
+- 战术数据只存在于当前页面内存和用户下载的 JSON 文件中，没有账号、数据库或云同步。
+- 静态站点没有服务端运维环境；访客只需现代浏览器。
+- GitHub Pages 是公开互联网服务。若要私有访问、账号同步、服务端统一转码或严格保证某一种视频格式，需要增加后端/对象存储，不再是当前的零环境静态项目。
