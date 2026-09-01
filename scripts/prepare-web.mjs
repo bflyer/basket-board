@@ -12,6 +12,7 @@ const assets = [
   'icon-192.png',
   'icon-512.png',
   'fix-webm-duration.js',
+  'tactics',
   'ffmpeg'
 ];
 

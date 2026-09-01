@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "tactics": [
+    {
+      "id": "horns-pick-and-roll",
+      "file": "horns-pick-and-roll.json"
+    },
+    {
+      "id": "three-lane-fast-break",
+      "file": "three-lane-fast-break.json"
+    },
+    {
+      "id": "baseline-screen-inbound",
+      "file": "baseline-screen-inbound.json"
+    }
+  ]
+}

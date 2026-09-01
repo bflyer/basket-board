@@ -189,6 +189,122 @@ h1 { margin-bottom: 8px; font-size: 22px; }
 }
 
 #file-input { display: none; }
+
+/* 战术库 */
+.library-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  background: rgba(3, 7, 18, 0.82);
+}
+.library-overlay.open { display: flex; }
+.library-panel {
+  width: min(920px, 100%);
+  max-height: 92vh;
+  overflow-y: auto;
+  background: #16213e;
+  border: 1px solid rgba(255,255,255,0.16);
+  border-radius: 12px;
+  box-shadow: 0 18px 60px rgba(0,0,0,0.55);
+}
+.library-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  background: #16213e;
+  border-bottom: 1px solid rgba(255,255,255,0.12);
+}
+.library-header h2 { font-size: 20px; }
+.library-close {
+  border: 0;
+  background: transparent;
+  color: #fff;
+  font-size: 26px;
+  cursor: pointer;
+}
+.library-content { padding: 18px 20px 22px; }
+.library-editor {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.8fr) minmax(260px, 1.6fr) auto;
+  gap: 10px;
+  align-items: end;
+  padding: 14px;
+  background: #0f3460;
+  border-radius: 8px;
+}
+.library-field { display: flex; flex-direction: column; gap: 5px; }
+.library-field label { color: #b8c2d9; font-size: 12px; }
+.library-field input,
+.library-field textarea {
+  width: 100%;
+  border: 1px solid rgba(255,255,255,0.18);
+  border-radius: 5px;
+  padding: 8px 10px;
+  background: #101a33;
+  color: #fff;
+  font: inherit;
+}
+.library-field textarea { resize: vertical; min-height: 58px; }
+.library-action {
+  padding: 10px 14px;
+  border: 0;
+  border-radius: 5px;
+  background: #e94560;
+  color: #fff;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.library-section-title { margin: 20px 0 10px; font-size: 16px; }
+.library-help { color: #9ca3af; font-size: 12px; line-height: 1.5; margin-top: 8px; }
+.library-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 10px;
+}
+.tactic-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 150px;
+  padding: 14px;
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 8px;
+  background: #101a33;
+}
+.tactic-card h3 { font-size: 15px; }
+.tactic-card p { color: #c6ccda; font-size: 13px; line-height: 1.5; flex: 1; }
+.tactic-card-meta { color: #8490aa; font-size: 11px; }
+.tactic-card-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.tactic-card button {
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 4px;
+  background: #0f3460;
+  color: #fff;
+  cursor: pointer;
+}
+.tactic-card button.danger { background: #7f1d1d; }
+.library-empty {
+  padding: 18px;
+  color: #9ca3af;
+  text-align: center;
+  border: 1px dashed rgba(255,255,255,0.18);
+  border-radius: 8px;
+}
+@media (max-width: 700px) {
+  .library-overlay { padding: 0; align-items: stretch; }
+  .library-panel { max-height: 100vh; border-radius: 0; }
+  .library-editor { grid-template-columns: 1fr; }
+  .library-action { width: 100%; }
+}
 </style>
 </head>
 <body>
@@ -205,7 +321,8 @@ h1 { margin-bottom: 8px; font-size: 22px; }
     <input type="range" id="speed-slider" min="0.25" max="1" step="0.25" value="0.5" oninput="updateSpeed(this.value)">
     <span id="speed-val">0.5x</span>
   </label>
-  <button onclick="saveTactic()">💾 保存战术</button>
+  <button id="btn-library" onclick="openTacticLibrary()">📚 战术库</button>
+  <button onclick="saveTactic()">💾 导出 JSON</button>
   <button onclick="document.getElementById('file-input').click()">📂 加载战术</button>
   <input type="file" id="file-input" accept=".json" onchange="loadTactic(event)">
 </div>
@@ -232,6 +349,35 @@ h1 { margin-bottom: 8px; font-size: 22px; }
   <textarea id="annotation-text" rows="2" placeholder="在此输入当前步骤的注释，播放时会同步显示..." maxlength="120" disabled></textarea>
 </div>
 
+<div class="library-overlay" id="tactic-library" role="dialog" aria-modal="true" aria-labelledby="library-title">
+  <div class="library-panel">
+    <div class="library-header">
+      <h2 id="library-title">📚 战术库</h2>
+      <button class="library-close" type="button" onclick="closeTacticLibrary()" aria-label="关闭">×</button>
+    </div>
+    <div class="library-content">
+      <div class="library-editor">
+        <div class="library-field">
+          <label for="tactic-name">当前战术名称</label>
+          <input id="tactic-name" maxlength="60" placeholder="例如：牛角挡拆">
+        </div>
+        <div class="library-field">
+          <label for="tactic-description">战术基础描述</label>
+          <textarea id="tactic-description" maxlength="500" placeholder="说明适用场景、目标和关键执行点"></textarea>
+        </div>
+        <button class="library-action" type="button" onclick="saveCurrentTacticLocally()">保存到本机</button>
+      </div>
+      <p class="library-help">本机战术保存在当前浏览器、当前网站的本地存储中；不会上传，也不会在设备之间同步。重要战术建议同时导出 JSON 备份。</p>
+
+      <h3 class="library-section-title">公开模板</h3>
+      <div class="library-grid" id="preset-tactics"><div class="library-empty">正在加载仓库模板…</div></div>
+
+      <h3 class="library-section-title">我的本机战术</h3>
+      <div class="library-grid" id="local-tactics"></div>
+    </div>
+  </div>
+</div>
+
 <script>
 // ==================== 常量 ====================
 const PIECE_COUNT = 11;
@@ -240,6 +386,9 @@ const TYPES = ['red','red','red','red','red','yellow','yellow','yellow','yellow'
 const TRAIL_COLORS = ['#e63946','#e63946','#e63946','#e63946','#e63946','#f4a261','#f4a261','#f4a261','#f4a261','#f4a261','#fb8500'];
 const STEP_PLAY_MS = 2000; // 1x 时每步 2 秒，较低速度会按比例延长
 const STEP_HOLD_MS = 400;
+const TACTIC_SCHEMA_VERSION = 2;
+const LOCAL_TACTICS_KEY = 'basket-board:custom-tactics:v1';
+const MAX_LOCAL_TACTICS = 50;
 
 // ==================== 状态 ====================
 let setupPositions = [];
@@ -249,6 +398,10 @@ let activeMove = null;
 let isPlaying = false;
 let playbackRAF = null;
 let playSpeed = 0.5;
+let currentLocalTacticId = null;
+let presetTactics = [];
+let presetsLoaded = false;
+let currentTacticMetadata = { author: '', tags: [] };
 
 const court = document.getElementById('court');
 const trailLayer = document.getElementById('trail-layer');
@@ -287,6 +440,8 @@ function init() {
   currentStep = -1;
   activeMove = null;
   isPlaying = false;
+  currentLocalTacticId = null;
+  setTacticMetadata({ name: '', description: '', author: '', tags: [] });
   if (playbackRAF) cancelAnimationFrame(playbackRAF);
   renderPieces();
   updateUI();
@@ -966,38 +1121,238 @@ async function playAll(shouldRecord = false) {
 }
 
 // ==================== 保存/加载 ====================
-function saveTactic() {
-  const data = {
-    version: 1,
-    setupPositions: setupPositions,
-    steps: steps,
-    savedAt: new Date().toISOString()
+function roundCoordinate(value) {
+  return Math.round(value * 1000000) / 1000000;
+}
+
+function makeTacticId(prefix = 'custom') {
+  if (window.crypto && typeof window.crypto.randomUUID === 'function') {
+    return `${prefix}-${window.crypto.randomUUID()}`;
+  }
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
+function setTacticMetadata(tactic) {
+  const nameInput = document.getElementById('tactic-name');
+  const descriptionInput = document.getElementById('tactic-description');
+  if (nameInput) nameInput.value = tactic.name || '';
+  if (descriptionInput) descriptionInput.value = tactic.description || '';
+  currentTacticMetadata = {
+    author: typeof tactic.author === 'string' ? tactic.author : '',
+    tags: Array.isArray(tactic.tags) ? tactic.tags.slice(0, 12).map(String) : []
   };
-  const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+}
+
+function normalizePoint(point) {
+  const width = court.clientWidth || 1;
+  const height = court.clientHeight || 1;
+  return {
+    x: roundCoordinate(point.x / width),
+    y: roundCoordinate(point.y / height)
+  };
+}
+
+function denormalizePoint(point) {
+  return {
+    x: point.x * court.clientWidth,
+    y: point.y * court.clientHeight
+  };
+}
+
+function sanitizeNormalizedPoint(point, label) {
+  if (!point || !Number.isFinite(point.x) || !Number.isFinite(point.y)) {
+    throw new Error(`${label} 坐标无效`);
+  }
+  if (point.x < 0 || point.x > 1 || point.y < 0 || point.y > 1) {
+    throw new Error(`${label} 坐标必须在 0 到 1 之间`);
+  }
+  return { x: Number(point.x), y: Number(point.y) };
+}
+
+function sanitizePortableTactic(data) {
+  if (!data || data.schemaVersion !== TACTIC_SCHEMA_VERSION) {
+    throw new Error(`不支持的战术格式版本（需要 schemaVersion ${TACTIC_SCHEMA_VERSION}）`);
+  }
+  if (!data.court || data.court.coordinateSystem !== 'normalized') {
+    throw new Error('战术必须使用 normalized 球场坐标');
+  }
+  if (data.court.pieceOrder !== undefined &&
+      (!Array.isArray(data.court.pieceOrder) || data.court.pieceOrder.length !== PIECE_COUNT)) {
+    throw new Error(`pieceOrder 必须包含 ${PIECE_COUNT} 个对象`);
+  }
+  if (!Array.isArray(data.setupPositions) || data.setupPositions.length !== PIECE_COUNT) {
+    throw new Error(`初始摆放必须包含 ${PIECE_COUNT} 个对象`);
+  }
+  if (!Array.isArray(data.steps) || data.steps.length > 100) {
+    throw new Error('步骤必须是数组且不能超过 100 步');
+  }
+
+  const setup = data.setupPositions.map((point, index) =>
+    sanitizeNormalizedPoint(point, `初始摆放 ${index + 1}`)
+  );
+  const cleanSteps = data.steps.map((step, stepIndex) => {
+    if (!step || !Array.isArray(step.moves) || step.moves.length > 200) {
+      throw new Error(`步骤 ${stepIndex + 1} 的移动格式无效`);
+    }
+    const moves = step.moves.map((move, moveIndex) => {
+      if (!move || !Number.isInteger(move.pieceIndex) || move.pieceIndex < 0 || move.pieceIndex >= PIECE_COUNT) {
+        throw new Error(`步骤 ${stepIndex + 1} 的移动 ${moveIndex + 1} 对象编号无效`);
+      }
+      if (!Array.isArray(move.points) || move.points.length < 2 || move.points.length > 5000) {
+        throw new Error(`步骤 ${stepIndex + 1} 的移动 ${moveIndex + 1} 轨迹无效`);
+      }
+      return {
+        pieceIndex: move.pieceIndex,
+        points: move.points.map((point, pointIndex) =>
+          sanitizeNormalizedPoint(point, `步骤 ${stepIndex + 1} 移动 ${moveIndex + 1} 轨迹点 ${pointIndex + 1}`)
+        )
+      };
+    });
+    return {
+      annotation: typeof step.annotation === 'string' ? step.annotation.slice(0, 120) : '',
+      moves
+    };
+  });
+
+  const name = typeof data.name === 'string' ? data.name.trim().slice(0, 60) : '';
+  if (!name) throw new Error('战术名称不能为空');
+
+  return {
+    schemaVersion: TACTIC_SCHEMA_VERSION,
+    id: typeof data.id === 'string' && data.id.trim() ? data.id.trim().slice(0, 100) : makeTacticId(),
+    name,
+    description: typeof data.description === 'string' ? data.description.trim().slice(0, 500) : '',
+    author: typeof data.author === 'string' ? data.author.trim().slice(0, 80) : '',
+    tags: Array.isArray(data.tags) ? data.tags.slice(0, 12).map(tag => String(tag).slice(0, 30)) : [],
+    court: {
+      coordinateSystem: 'normalized',
+      pieceOrder: Array.isArray(data.court.pieceOrder)
+        ? data.court.pieceOrder.slice(0, PIECE_COUNT).map(String)
+        : ['red-1','red-2','red-3','red-4','red-5','yellow-1','yellow-2','yellow-3','yellow-4','yellow-5','ball']
+    },
+    setupPositions: setup,
+    steps: cleanSteps,
+    createdAt: typeof data.createdAt === 'string' ? data.createdAt : undefined,
+    updatedAt: typeof data.updatedAt === 'string' ? data.updatedAt : undefined
+  };
+}
+
+function createPortableTactic(overrides = {}) {
+  const nameInput = document.getElementById('tactic-name');
+  const descriptionInput = document.getElementById('tactic-description');
+  const tactic = {
+    schemaVersion: TACTIC_SCHEMA_VERSION,
+    id: overrides.id || makeTacticId(),
+    name: overrides.name || (nameInput && nameInput.value.trim()) || '未命名战术',
+    description: overrides.description !== undefined
+      ? overrides.description
+      : (descriptionInput && descriptionInput.value.trim()) || '',
+    author: overrides.author !== undefined ? overrides.author : currentTacticMetadata.author,
+    tags: overrides.tags || currentTacticMetadata.tags,
+    court: {
+      coordinateSystem: 'normalized',
+      pieceOrder: ['red-1','red-2','red-3','red-4','red-5','yellow-1','yellow-2','yellow-3','yellow-4','yellow-5','ball']
+    },
+    setupPositions: setupPositions.map(normalizePoint),
+    steps: getPlaybackSteps().map(step => ({
+      annotation: typeof step.annotation === 'string' ? step.annotation : '',
+      moves: (step.moves || []).map(move => ({
+        pieceIndex: move.pieceIndex,
+        points: move.points.map(normalizePoint)
+      }))
+    })),
+    createdAt: overrides.createdAt || new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  };
+  return sanitizePortableTactic(tactic);
+}
+
+function applyPortableTactic(data) {
+  const tactic = sanitizePortableTactic(data);
+  setupPositions = tactic.setupPositions.map(denormalizePoint);
+  steps = tactic.steps.map(step => ({
+    annotation: step.annotation,
+    moves: step.moves.map(move => ({
+      pieceIndex: move.pieceIndex,
+      points: move.points.map(denormalizePoint)
+    }))
+  }));
+  setTacticMetadata(tactic);
+  return tactic;
+}
+
+function applyLegacyTactic(data) {
+  if (!data || !Array.isArray(data.setupPositions) || data.setupPositions.length !== PIECE_COUNT || !Array.isArray(data.steps)) {
+    throw new Error('旧版战术格式错误');
+  }
+  const cleanPoint = (point, label) => {
+    if (!point || !Number.isFinite(point.x) || !Number.isFinite(point.y)) throw new Error(`${label} 坐标无效`);
+    return { x: Number(point.x), y: Number(point.y) };
+  };
+  setupPositions = data.setupPositions.map((point, index) => cleanPoint(point, `初始摆放 ${index + 1}`));
+  steps = data.steps.slice(0, 100).map((step, stepIndex) => ({
+    annotation: typeof step.annotation === 'string' ? step.annotation.slice(0, 120) : '',
+    moves: Array.isArray(step.moves) ? step.moves.slice(0, 200).map((move, moveIndex) => {
+      if (!Number.isInteger(move.pieceIndex) || move.pieceIndex < 0 || move.pieceIndex >= PIECE_COUNT || !Array.isArray(move.points)) {
+        throw new Error(`步骤 ${stepIndex + 1} 的移动 ${moveIndex + 1} 无效`);
+      }
+      return {
+        pieceIndex: move.pieceIndex,
+        points: move.points.map((point, pointIndex) => cleanPoint(point, `轨迹点 ${pointIndex + 1}`))
+      };
+    }) : []
+  }));
+  setTacticMetadata({
+    name: typeof data.name === 'string' ? data.name : '导入的旧版战术',
+    description: typeof data.description === 'string' ? data.description : '',
+    author: '',
+    tags: []
+  });
+  return null;
+}
+
+function finishApplyingTactic() {
+  currentStep = steps.length > 0 ? steps.length - 1 : -1;
+  activeMove = null;
+  dragIdx = -1;
+  isPlaying = false;
+  if (playbackRAF) cancelAnimationFrame(playbackRAF);
+  renderPieces();
+  updateUI();
+}
+
+function downloadTacticJson(data) {
+  const tactic = sanitizePortableTactic(data);
+  const blob = new Blob([JSON.stringify(tactic, null, 2)], {type: 'application/json'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = 'tactic_' + new Date().toISOString().slice(0,19).replace(/[:T]/g,'-') + '.json';
+  const safeName = tactic.name.replace(/[^\p{L}\p{N}_-]+/gu, '-').replace(/^-+|-+$/g, '') || 'tactic';
+  a.download = `${safeName}.json`;
   a.click();
-  URL.revokeObjectURL(url);
+  setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
+function saveTactic() {
+  downloadTacticJson(createPortableTactic());
 }
 
 function loadTactic(event) {
   const file = event.target.files[0];
   if (!file) return;
+  if (isPlaying) {
+    alert('请等待播放结束后再加载战术。');
+    event.target.value = '';
+    return;
+  }
   const reader = new FileReader();
   reader.onload = e => {
     try {
       const data = JSON.parse(e.target.result);
-      if (!data.setupPositions || !Array.isArray(data.steps)) throw new Error('格式错误');
-      setupPositions = data.setupPositions;
-      steps = data.steps;
-      currentStep = steps.length > 0 ? steps.length - 1 : -1;
-      activeMove = null;
-      isPlaying = false;
-      if (playbackRAF) cancelAnimationFrame(playbackRAF);
-      renderPieces();
-      updateUI();
+      if (data.schemaVersion === TACTIC_SCHEMA_VERSION) applyPortableTactic(data);
+      else applyLegacyTactic(data);
+      currentLocalTacticId = null;
+      finishApplyingTactic();
       alert('战术加载成功！');
     } catch (err) {
       alert('加载失败：' + err.message);
@@ -1006,6 +1361,204 @@ function loadTactic(event) {
   reader.readAsText(file);
   event.target.value = '';
 }
+
+function readLocalTactics() {
+  let stored;
+  try {
+    stored = JSON.parse(localStorage.getItem(LOCAL_TACTICS_KEY) || '[]');
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(stored)) return [];
+  const valid = [];
+  for (const item of stored) {
+    try {
+      valid.push(sanitizePortableTactic(item));
+    } catch (error) {
+      console.warn('忽略损坏的本机战术:', error);
+    }
+  }
+  return valid;
+}
+
+function writeLocalTactics(tactics) {
+  try {
+    localStorage.setItem(LOCAL_TACTICS_KEY, JSON.stringify(tactics.slice(0, MAX_LOCAL_TACTICS)));
+  } catch (error) {
+    throw new Error(`浏览器本地存储写入失败：${getErrorMessage(error)}`);
+  }
+}
+
+function saveCurrentTacticLocally() {
+  const nameInput = document.getElementById('tactic-name');
+  const name = nameInput.value.trim();
+  if (!name) {
+    alert('请先填写战术名称。');
+    nameInput.focus();
+    return;
+  }
+
+  try {
+    const tactics = readLocalTactics();
+    const existingIndex = currentLocalTacticId
+      ? tactics.findIndex(tactic => tactic.id === currentLocalTacticId)
+      : -1;
+    const existing = existingIndex >= 0 ? tactics[existingIndex] : null;
+    const tactic = createPortableTactic({
+      id: existing ? existing.id : makeTacticId('local'),
+      name,
+      createdAt: existing ? existing.createdAt : undefined
+    });
+    if (existingIndex >= 0) tactics.splice(existingIndex, 1);
+    tactics.unshift(tactic);
+    writeLocalTactics(tactics);
+    currentLocalTacticId = tactic.id;
+    renderLocalTactics();
+    alert(existing ? '本机战术已更新。' : '战术已保存到本机浏览器。');
+  } catch (error) {
+    alert(getErrorMessage(error));
+  }
+}
+
+function createTacticCard(tactic, source) {
+  const card = document.createElement('article');
+  card.className = 'tactic-card';
+
+  const title = document.createElement('h3');
+  title.textContent = tactic.name;
+  const description = document.createElement('p');
+  description.textContent = tactic.description || '暂无基础描述';
+  const meta = document.createElement('div');
+  meta.className = 'tactic-card-meta';
+  const tags = tactic.tags.length ? ` · ${tactic.tags.join(' / ')}` : '';
+  meta.textContent = `${tactic.steps.length} 个步骤${tactic.author ? ` · ${tactic.author}` : ''}${tags}`;
+
+  const actions = document.createElement('div');
+  actions.className = 'tactic-card-actions';
+  const loadButton = document.createElement('button');
+  loadButton.type = 'button';
+  loadButton.textContent = '加载到战术板';
+  loadButton.addEventListener('click', () => loadLibraryTactic(tactic, source));
+  actions.appendChild(loadButton);
+
+  const exportButton = document.createElement('button');
+  exportButton.type = 'button';
+  exportButton.textContent = '导出 JSON';
+  exportButton.addEventListener('click', () => downloadTacticJson(tactic));
+  actions.appendChild(exportButton);
+
+  if (source === 'local') {
+    const deleteButton = document.createElement('button');
+    deleteButton.type = 'button';
+    deleteButton.className = 'danger';
+    deleteButton.textContent = '删除';
+    deleteButton.addEventListener('click', () => deleteLocalTactic(tactic.id));
+    actions.appendChild(deleteButton);
+  }
+
+  card.append(title, description, meta, actions);
+  return card;
+}
+
+function renderTacticList(container, tactics, source, emptyText) {
+  container.replaceChildren();
+  if (!tactics.length) {
+    const empty = document.createElement('div');
+    empty.className = 'library-empty';
+    empty.textContent = emptyText;
+    container.appendChild(empty);
+    return;
+  }
+  tactics.forEach(tactic => container.appendChild(createTacticCard(tactic, source)));
+}
+
+function renderLocalTactics() {
+  renderTacticList(
+    document.getElementById('local-tactics'),
+    readLocalTactics(),
+    'local',
+    '还没有本机战术。填写上方名称后即可保存当前战术。'
+  );
+}
+
+async function loadPresetTactics() {
+  const container = document.getElementById('preset-tactics');
+  if (presetsLoaded) {
+    renderTacticList(container, presetTactics, 'preset', '仓库内暂无公开模板。');
+    return;
+  }
+
+  try {
+    const response = await fetch('./tactics/index.json');
+    if (!response.ok) throw new Error(`模板索引 HTTP ${response.status}`);
+    const index = await response.json();
+    if (!index || !Array.isArray(index.tactics)) throw new Error('模板索引格式错误');
+    const loaded = await Promise.all(index.tactics.map(async entry => {
+      if (!entry || typeof entry.file !== 'string' || !/^[a-z0-9-]+\.json$/.test(entry.file)) {
+        throw new Error('模板文件路径无效');
+      }
+      const tacticResponse = await fetch(new URL(entry.file, new URL('./tactics/', window.location.href)));
+      if (!tacticResponse.ok) throw new Error(`${entry.file} HTTP ${tacticResponse.status}`);
+      const tactic = sanitizePortableTactic(await tacticResponse.json());
+      if (entry.id && entry.id !== tactic.id) throw new Error(`${entry.file} 的 id 与索引不一致`);
+      return tactic;
+    }));
+    presetTactics = loaded;
+    presetsLoaded = true;
+    renderTacticList(container, presetTactics, 'preset', '仓库内暂无公开模板。');
+  } catch (error) {
+    container.replaceChildren();
+    const empty = document.createElement('div');
+    empty.className = 'library-empty';
+    empty.textContent = `公开模板加载失败：${getErrorMessage(error)}`;
+    container.appendChild(empty);
+  }
+}
+
+function loadLibraryTactic(tactic, source) {
+  if (!confirm(`加载“${tactic.name}”将替换战术板上的当前内容，是否继续？`)) return;
+  try {
+    const clean = applyPortableTactic(tactic);
+    currentLocalTacticId = source === 'local' ? clean.id : null;
+    finishApplyingTactic();
+    closeTacticLibrary();
+  } catch (error) {
+    alert(`战术加载失败：${getErrorMessage(error)}`);
+  }
+}
+
+function deleteLocalTactic(id) {
+  const tactics = readLocalTactics();
+  const target = tactics.find(tactic => tactic.id === id);
+  if (!target || !confirm(`确定删除本机战术“${target.name}”吗？`)) return;
+  writeLocalTactics(tactics.filter(tactic => tactic.id !== id));
+  if (currentLocalTacticId === id) currentLocalTacticId = null;
+  renderLocalTactics();
+}
+
+function openTacticLibrary() {
+  if (isPlaying) {
+    alert('请等待播放结束后再打开战术库。');
+    return;
+  }
+  const overlay = document.getElementById('tactic-library');
+  overlay.classList.add('open');
+  document.body.style.overflow = 'hidden';
+  renderLocalTactics();
+  loadPresetTactics();
+}
+
+function closeTacticLibrary() {
+  document.getElementById('tactic-library').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+document.getElementById('tactic-library').addEventListener('click', event => {
+  if (event.target.id === 'tactic-library') closeTacticLibrary();
+});
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape') closeTacticLibrary();
+});
 
 // ==================== 响应式 ====================
 window.addEventListener('resize', () => {

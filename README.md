@@ -8,6 +8,7 @@
 
 - 5 名红队球员、5 名黄队球员和 1 个篮球
 - 初始站位、多步骤跑位、轨迹与步骤注释
+- 战术库：仓库公开模板，以及当前浏览器内保存的自定义战术
 - 回放速度调节、撤销与分级重置
 - 战术 JSON 导入/导出
 - 浏览器视频录制；优先原生 MP4，不支持时保存 WebM 并可在浏览器内转为 H.264 MP4
@@ -24,6 +25,7 @@
 ├── service-worker.js          # 离线缓存
 ├── icon-192.png / icon-512.png
 ├── fix-webm-duration.js       # WebM 时长修复
+├── tactics/                   # 公开战术模板和模板索引
 ├── ffmpeg/                    # 本地 ffmpeg.wasm（WebM → MP4）
 ├── scripts/prepare-web.mjs    # 生成 Capacitor 使用的 www/
 ├── capacitor.config.json
@@ -94,6 +96,46 @@ Debug APK 输出在 `android/app/build/outputs/apk/debug/app-debug.apk`。Androi
 
 每次修改网页源码后，先执行 `npm run sync`，再重新构建 APK。`sync` 会重新生成 `www/`，并复制完整的页面、WebM 修复库和 FFmpeg 编码器。
 
+## 战术库与 JSON 规范
+
+公开模板位于 `tactics/`，`index.json` 保存模板清单，每个战术使用独立 JSON 文件。模板坐标采用相对于球场宽高的归一化坐标：左上角是 `(0, 0)`，右下角是 `(1, 1)`，因此可以在不同尺寸的浏览器中按比例还原。
+
+战术格式版本为 `schemaVersion: 2`，主要字段如下：
+
+```json
+{
+  "schemaVersion": 2,
+  "id": "horns-pick-and-roll",
+  "name": "牛角挡拆",
+  "description": "战术基础描述",
+  "author": "Basket Board",
+  "tags": ["半场进攻", "挡拆"],
+  "court": {
+    "coordinateSystem": "normalized",
+    "pieceOrder": ["red-1", "red-2", "red-3", "red-4", "red-5", "yellow-1", "yellow-2", "yellow-3", "yellow-4", "yellow-5", "ball"]
+  },
+  "setupPositions": [{"x": 0.58, "y": 0.5}],
+  "steps": [
+    {
+      "annotation": "步骤说明",
+      "moves": [
+        {"pieceIndex": 0, "points": [{"x": 0.58, "y": 0.5}, {"x": 0.7, "y": 0.6}]}
+      ]
+    }
+  ]
+}
+```
+
+实际文件的 `setupPositions` 必须有 11 项，依次对应红队 1–5、黄队 1–5和篮球。`pieceIndex` 采用相同的 0–10 顺序。新增或修改模板后运行：
+
+```bash
+npm run test:tactics
+```
+
+本机自定义战术使用固定键 `basket-board:custom-tactics:v1` 存入 `localStorage`，最多保留 50 个。它只属于当前浏览器配置、当前站点来源，不会跨浏览器或设备同步；隐私模式结束、清除网站数据或浏览器重置都可能删除它，因此重要战术应导出 JSON 备份。
+
+当前项目是纯静态 GitHub Pages，浏览器不能安全地直接修改仓库，也没有所有访客共享的数据库。因此“用户提交 → 管理员审核 → 所有人可见”不能在不更新静态文件的情况下完成。当前可行流程是用户导出 JSON，将文件交给维护者审核；维护者把文件加入 `tactics/`、更新索引并 push。若要网页内直接投稿和审核，需要另加带身份认证的后端或托管数据库。
+
 ## 视频与浏览器兼容性
 
 录制依赖 `canvas.captureStream()`、`MediaRecorder` 和浏览器支持的编码器：
@@ -108,6 +150,6 @@ Debug APK 输出在 `android/app/build/outputs/apk/debug/app-debug.apk`。Androi
 
 ## 数据与运维边界
 
-- 战术数据只存在于当前页面内存和用户下载的 JSON 文件中，没有账号、数据库或云同步。
+- 自定义战术只存在于当前浏览器的本地存储和用户导出的 JSON 文件中，没有账号、数据库或云同步。
 - 静态站点没有服务端运维环境；访客只需现代浏览器。
 - GitHub Pages 是公开互联网服务。若要私有访问、账号同步、服务端统一转码或严格保证某一种视频格式，需要增加后端/对象存储，不再是当前的零环境静态项目。

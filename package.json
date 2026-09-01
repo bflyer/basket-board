@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "篮球战术板 - 交互式战术编排工具",
   "scripts": {
+    "test:tactics": "node scripts/test-tactics.mjs",
     "prepare:web": "node scripts/prepare-web.mjs",
     "sync": "npm run prepare:web && cap sync android",
     "android": "cap open android",
