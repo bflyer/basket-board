@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="600" viewBox="0 0 1200 600" role="img" aria-labelledby="title desc">
+  <title id="title">创建一个多步骤战术</title>
+  <desc id="desc">依次展示初始摆放、拖出移动轨迹、填写步骤说明和完成步骤。</desc>
+  <defs>
+    <style>text{font-family:"Microsoft YaHei","Noto Sans CJK SC",sans-serif}.h{fill:#fff;font-size:21px;font-weight:700}.t{fill:#dbeafe;font-size:15px}.n{fill:#fff;font-size:20px;font-weight:700}.court{fill:#c98d50;stroke:#fff;stroke-width:3}.path{fill:none;stroke:#e63946;stroke-width:5;stroke-dasharray:9 7}</style>
+    <marker id="redArrow" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0 0 L10 5 L0 10z" fill="#e63946"/></marker>
+  </defs>
+  <rect width="1200" height="600" fill="#0b1023"/>
+  <text x="600" y="42" text-anchor="middle" class="h" font-size="27">从初始摆放到多个步骤</text>
+  <g transform="translate(45 80)">
+    <circle cx="35" cy="25" r="24" fill="#e94560"/><text x="35" y="32" text-anchor="middle" class="n">1</text><text x="75" y="23" class="h">摆好初始位置</text><text x="75" y="46" class="t">拖动球员和篮球；此时不记录轨迹。</text>
+    <rect class="court" x="0" y="75" width="330" height="176" rx="7"/><line x1="165" y1="75" x2="165" y2="251" stroke="#fff" stroke-width="2"/><circle cx="165" cy="163" r="35" fill="none" stroke="#fff" stroke-width="2"/>
+    <circle cx="92" cy="140" r="17" fill="#e63946" stroke="#fff" stroke-width="2"/><text x="92" y="146" text-anchor="middle" class="t">1</text><circle cx="126" cy="205" r="17" fill="#e63946" stroke="#fff" stroke-width="2"/><text x="126" y="211" text-anchor="middle" class="t">2</text><circle cx="190" cy="160" r="12" fill="#fb8500" stroke="#fff" stroke-width="2"/><text x="190" y="164" text-anchor="middle" font-size="9" fill="#fff">球</text>
+    <rect x="70" y="275" width="190" height="40" rx="7" fill="#e94560"/><text x="165" y="301" text-anchor="middle" class="t">✅ 完成初始摆放</text>
+  </g>
+  <g transform="translate(435 80)">
+    <circle cx="35" cy="25" r="24" fill="#e94560"/><text x="35" y="32" text-anchor="middle" class="n">2</text><text x="75" y="23" class="h">拖出本步骤轨迹</text><text x="75" y="46" class="t">按住棋子拖动；同一步可移动多人。</text>
+    <rect class="court" x="0" y="75" width="330" height="176" rx="7"/><line x1="165" y1="75" x2="165" y2="251" stroke="#fff" stroke-width="2"/><circle cx="165" cy="163" r="35" fill="none" stroke="#fff" stroke-width="2"/>
+    <circle cx="90" cy="170" r="17" fill="#e63946" stroke="#fff" stroke-width="2"/><text x="90" y="176" text-anchor="middle" class="t">1</text><path class="path" d="M90 170 C140 110 220 115 270 155" marker-end="url(#redArrow)"/><circle cx="190" cy="178" r="12" fill="#fb8500" stroke="#fff" stroke-width="2"/>
+    <rect x="22" y="275" width="130" height="40" rx="7" fill="#d97706"/><text x="87" y="301" text-anchor="middle" class="t">↩ 撤销拖动</text><rect x="165" y="275" width="140" height="40" rx="7" fill="#d97706"/><text x="235" y="301" text-anchor="middle" class="t">🔄 重置步骤</text>
+  </g>
+  <g transform="translate(825 80)">
+    <circle cx="35" cy="25" r="24" fill="#e94560"/><text x="35" y="32" text-anchor="middle" class="n">3</text><text x="75" y="23" class="h">写说明并完成</text><text x="75" y="46" class="t">注释会在播放和视频中同步显示。</text>
+    <rect x="0" y="75" width="330" height="120" rx="8" fill="#16213e"/><text x="18" y="101" class="t" fill="#94a3b8">步骤注释</text><rect x="18" y="112" width="294" height="65" rx="6" fill="#0f3460"/><text x="32" y="141" class="t">1号借4号掩护向右突破，</text><text x="32" y="163" class="t">4号顺下接球。</text>
+    <rect x="65" y="218" width="200" height="42" rx="7" fill="#e94560"/><text x="165" y="245" text-anchor="middle" class="t">✅ 完成步骤</text>
+    <path d="M165 270 L165 330" stroke="#38bdf8" stroke-width="4"/><path d="M155 320 L165 334 L175 320" fill="none" stroke="#38bdf8" stroke-width="4"/>
+    <rect x="70" y="345" width="190" height="58" rx="8" fill="#101a33" stroke="#38bdf8"/><text x="165" y="370" text-anchor="middle" class="h" font-size="17">进入下一个步骤</text><text x="165" y="391" text-anchor="middle" class="t">继续拖动、注释、完成</text>
+  </g>
+  <rect x="70" y="525" width="1060" height="48" rx="8" fill="#16213e"/><text x="600" y="556" text-anchor="middle" class="t" font-size="17">提示：返回较早步骤后再点“完成步骤”，其后的步骤会被新的分支替换；重要战术请先保存。</text>
+</svg>
