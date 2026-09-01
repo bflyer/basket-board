@@ -1114,6 +1114,45 @@ async function fetchFile(file) {
   return new Uint8Array(buf);
 }
 
+function getErrorMessage(error) {
+  if (error instanceof Error && error.message) return error.message;
+  if (typeof error === 'string') return error;
+  try {
+    return JSON.stringify(error) || String(error);
+  } catch {
+    return String(error);
+  }
+}
+
+async function downloadAsBlobURL(url, mimeType, onProgress) {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`下载失败（HTTP ${response.status}）：${url}`);
+  }
+
+  const total = Number(response.headers.get('content-length')) || 0;
+  if (!response.body || typeof response.body.getReader !== 'function') {
+    const blob = await response.blob();
+    onProgress(1);
+    return URL.createObjectURL(new Blob([blob], { type: mimeType }));
+  }
+
+  const reader = response.body.getReader();
+  const chunks = [];
+  let loaded = 0;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    loaded += value.byteLength;
+    if (total > 0) onProgress(Math.min(1, loaded / total));
+  }
+
+  onProgress(1);
+  return URL.createObjectURL(new Blob(chunks, { type: mimeType }));
+}
+
 async function loadFfmpeg() {
   if (ffmpegInstance) return ffmpegInstance;
   if (ffmpegLoading) {
@@ -1122,7 +1161,9 @@ async function loadFfmpeg() {
   }
 
   ffmpegLoading = true;
-  const overlay = createProgressOverlay('📦 正在加载视频编码器', '首次使用约需加载 25MB，请稍候…');
+  const overlay = createProgressOverlay('📦 正在加载视频编码器', '无需安装软件，首次需下载约 32MB，请稍候…');
+  let coreBlobURL = null;
+  let wasmBlobURL = null;
 
   try {
     // ffmpeg.js 通过 <script> 标签在 <head> 中加载，使用本地文件
@@ -1133,19 +1174,36 @@ async function loadFfmpeg() {
       console.log('[ffmpeg]', message);
     });
 
-    // 使用本地 ffmpeg core 文件（相对于 ffmpeg.js 的 publicPath）
-    const coreURL = './ffmpeg-core.js';
-    const wasmURL = './ffmpeg-core.wasm';
+    const baseURL = new URL('./ffmpeg/', window.location.href);
+    const coreURL = new URL('ffmpeg-core.js', baseURL).href;
+    const wasmURL = new URL('ffmpeg-core.wasm', baseURL).href;
 
-    await ffmpeg.load({ coreURL, wasmURL });
+    overlay.setText('正在下载编码器脚本…');
+    coreBlobURL = await downloadAsBlobURL(coreURL, 'text/javascript', progress => {
+      overlay.setProgress(Math.round(progress * 2));
+    });
+
+    overlay.setText('正在下载约 32MB 编码器… 0%');
+    wasmBlobURL = await downloadAsBlobURL(wasmURL, 'application/wasm', progress => {
+      const downloadPct = Math.round(progress * 100);
+      overlay.setProgress(2 + Math.round(progress * 88));
+      overlay.setText(`正在下载约 32MB 编码器… ${downloadPct}%`);
+    });
+
+    overlay.setProgress(92);
+    overlay.setText('下载完成，正在初始化编码器…');
+    await ffmpeg.load({ coreURL: coreBlobURL, wasmURL: wasmBlobURL });
+    overlay.setProgress(100);
 
     ffmpegInstance = { ffmpeg, fetchFile };
     return ffmpegInstance;
   } catch (e) {
     console.error('ffmpeg 加载失败:', e);
-    alert('视频编码器加载失败，请检查网络连接。\n错误: ' + e.message);
+    alert('视频编码器加载失败。\n错误: ' + getErrorMessage(e));
     throw e;
   } finally {
+    if (coreBlobURL) URL.revokeObjectURL(coreBlobURL);
+    if (wasmBlobURL) URL.revokeObjectURL(wasmBlobURL);
     ffmpegLoading = false;
     overlay.remove();
   }
@@ -1201,7 +1259,7 @@ async function transcodeWebmToMp4(webmBlob, filename) {
   } catch (e) {
     overlay.remove();
     console.error('转码失败:', e);
-    alert('转码失败: ' + e.message);
+    alert('转码失败: ' + getErrorMessage(e));
   }
 }
 

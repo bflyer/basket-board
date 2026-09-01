@@ -100,7 +100,7 @@ Debug APK 输出在 `android/app/build/outputs/apk/debug/app-debug.apk`。Androi
 
 - 浏览器支持 H.264/MP4 录制时，直接下载 MP4。
 - 只支持 WebM 时，先下载已修复时长的 WebM；页面随后提供“转码为手机 MP4”，使用仓库内约 32 MB 的 ffmpeg.wasm 转为 H.264/yuv420p MP4。
-- FFmpeg、WebM 修复库和页面资源会被 PWA 缓存；首次完整加载后可离线使用和转码。
+- FFmpeg、WebM 修复库和页面资源会被 PWA 缓存；首次成功使用转码后，编码器可从缓存加载。
 - 最新版 Chrome、Edge、Firefox 和 Safari 覆盖面较好，但无法承诺“任意浏览器”：旧浏览器、内嵌微信浏览器、部分 iOS/Android WebView 可能缺少录制、Worker、WebAssembly 或下载能力。
 - 视频跨播放器兼容也不是绝对保证。最稳妥的交付格式是页面直接生成或转码后的 MP4，而不是原始 WebM。
 
