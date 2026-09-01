@@ -338,7 +338,7 @@ h1 { margin-bottom: 8px; font-size: 22px; }
   <button id="btn-prev" onclick="goPrev()">⬅ 上一步</button>
   <span class="step-info" id="step-info">初始摆放</span>
   <button id="btn-finish" class="primary" onclick="finishStep()">✅ 完成步骤</button>
-  <button id="btn-play" onclick="playAll(false)">▶ 播放全部</button>
+  <button id="btn-play" onclick="togglePlayback()">▶ 播放全部</button>
   <label class="speed-label">
     速度
     <input type="range" id="speed-slider" min="0.25" max="1" step="0.25" value="0.5" oninput="updateSpeed(this.value)">
@@ -428,6 +428,9 @@ let currentStep = -1;
 let activeMove = null;
 let isPlaying = false;
 let playbackRAF = null;
+let playbackWaitResolve = null;
+let playbackStopRequested = false;
+let isRecordingPlayback = false;
 let playSpeed = 0.5;
 let currentLocalTacticId = null;
 let presetTactics = [];
@@ -476,6 +479,10 @@ function init() {
   currentLocalTacticId = null;
   setTacticMetadata({ name: '', description: '', author: '', tags: [] });
   if (playbackRAF) cancelAnimationFrame(playbackRAF);
+  playbackRAF = null;
+  playbackWaitResolve = null;
+  playbackStopRequested = false;
+  isRecordingPlayback = false;
   renderPieces();
   updateUI();
 }
@@ -669,18 +676,26 @@ function updateUI() {
   const btnPlay = document.getElementById('btn-play');
   const btnRecord = document.getElementById('btn-record');
   const btnResetAll = document.getElementById('btn-reset-all');
+  const btnLibrary = document.getElementById('btn-library');
   const slider = document.getElementById('speed-slider');
 
   if (isPlaying) {
-    stepInfo.textContent = `播放中…`;
-    [btnPrev, btnUndo, btnResetStep, btnFinish, btnPlay, btnRecord, btnResetAll, slider].forEach(b => b.disabled = true);
+    stepInfo.textContent = isRecordingPlayback ? '录制中…' : '播放中…';
+    [btnPrev, btnUndo, btnResetStep, btnFinish, btnRecord, btnResetAll, btnLibrary].forEach(b => b.disabled = true);
+    btnPlay.disabled = false;
+    btnPlay.textContent = '⏹ 停止播放';
+    btnPlay.classList.add('warn');
+    slider.disabled = false;
     annoInput.disabled = true;
     return;
   }
 
   const isFileProtocol = window.location.protocol === 'file:';
   btnResetAll.disabled = false;
+  btnLibrary.disabled = false;
   btnPlay.disabled = playableStepCount < 1;
+  btnPlay.textContent = '▶ 播放全部';
+  btnPlay.classList.remove('warn');
   btnRecord.disabled = playableStepCount < 1 || isFileProtocol;
   btnRecord.title = (isFileProtocol && playableStepCount >= 1)
     ? '通过本地文件(file://)打开时无法录制视频，请通过 HTTP 服务器访问（如 python3 -m http.server）'
@@ -948,15 +963,69 @@ async function loadFixWebmDuration() {
   });
 }
 
+function togglePlayback() {
+  if (isPlaying) stopPlayback();
+  else playAll(false);
+}
+
+function stopPlayback() {
+  if (!isPlaying || playbackStopRequested) return;
+  playbackStopRequested = true;
+  stepInfo.textContent = isRecordingPlayback ? '正在停止录制…' : '正在停止播放…';
+  if (playbackRAF) {
+    cancelAnimationFrame(playbackRAF);
+    playbackRAF = null;
+  }
+  if (playbackWaitResolve) playbackWaitResolve(false);
+}
+
+function runPlaybackSegment(baseDurationMs, onProgress) {
+  return new Promise(resolve => {
+    let settled = false;
+    let elapsedAt1x = 0;
+    let lastTime = null;
+
+    const finish = completed => {
+      if (settled) return;
+      settled = true;
+      if (playbackRAF) cancelAnimationFrame(playbackRAF);
+      playbackRAF = null;
+      if (playbackWaitResolve === finish) playbackWaitResolve = null;
+      resolve(completed);
+    };
+
+    playbackWaitResolve = finish;
+    const frame = now => {
+      if (playbackStopRequested) {
+        finish(false);
+        return;
+      }
+      if (lastTime !== null) {
+        elapsedAt1x += Math.max(0, now - lastTime) * playSpeed;
+      }
+      lastTime = now;
+      const progress = Math.min(1, elapsedAt1x / baseDurationMs);
+      onProgress(progress);
+      if (progress >= 1) finish(true);
+      else playbackRAF = requestAnimationFrame(frame);
+    };
+    playbackRAF = requestAnimationFrame(frame);
+  });
+}
+
 async function playAll(shouldRecord = false) {
   const playbackSteps = getPlaybackSteps();
   if (isPlaying || playbackSteps.length < 1) return;
   isPlaying = true;
+  isRecordingPlayback = shouldRecord;
+  playbackStopRequested = false;
   updateUI();
 
   const canvas = document.getElementById('play-canvas');
   const ctx = canvas.getContext('2d');
   let recorder = null;
+  let recordingStream = null;
+  let recordingStartedAt = 0;
   const chunks = [];
 
   try {
@@ -986,13 +1055,15 @@ async function playAll(shouldRecord = false) {
       });
     }
 
+    if (playbackStopRequested) return;
+
     let mimeType = null;
     if (shouldRecord) {
       if (!window.MediaRecorder || typeof canvas.captureStream !== 'function') {
         throw new Error('当前浏览器不支持视频录制，请使用最新版 Chrome、Edge、Firefox 或 Safari');
       }
 
-      // 优先使用浏览器原生 MP4；不支持时回退到 WebM，并提供浏览器内转码。
+      // 优先使用浏览器原生 MP4；不支持时回退到 WebM，并自动在浏览器内转码。
       const candidates = [
         'video/mp4; codecs=avc1.42E01E',
         'video/mp4',
@@ -1009,26 +1080,26 @@ async function playAll(shouldRecord = false) {
     }
 
     if (shouldRecord) {
-      const stream = canvas.captureStream(30);
+      recordingStream = canvas.captureStream(30);
       try {
         recorder = mimeType
-          ? new MediaRecorder(stream, { mimeType })
-          : new MediaRecorder(stream);
+          ? new MediaRecorder(recordingStream, { mimeType })
+          : new MediaRecorder(recordingStream);
       } catch (e) {
-        recorder = new MediaRecorder(stream);
+        recorder = new MediaRecorder(recordingStream);
       }
       mimeType = recorder.mimeType || mimeType || 'video/webm';
       recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
       recorder.start(100);
+      recordingStartedAt = performance.now();
     }
 
     let base = clonePositions(setupPositions);
-    for (let s = 0; s < playbackSteps.length; s++) {
+    for (let s = 0; s < playbackSteps.length && !playbackStopRequested; s++) {
+      stepInfo.textContent = `${isRecordingPlayback ? '录制' : '播放'}步骤 ${s + 1} / ${playbackSteps.length}`;
       const step = playbackSteps[s];
       const startPos = clonePositions(base);
       const endPos = applyStepMoves(base, step);
-      const duration = STEP_PLAY_MS / playSpeed;
-      const holdTime = s < playbackSteps.length - 1 ? STEP_HOLD_MS / playSpeed : 0;
 
       const playPaths = new Array(PIECE_COUNT).fill(null);
       if (step && step.moves) {
@@ -1055,58 +1126,53 @@ async function playAll(shouldRecord = false) {
         }
       }
 
-      await new Promise(resolve => {
-        const startTime = performance.now();
-        function frame(now) {
-          const rawT = Math.min(1, (now - startTime) / duration);
-          const t = easeInOut(rawT);
+      const stepCompleted = await runPlaybackSegment(STEP_PLAY_MS, rawT => {
+        const t = easeInOut(rawT);
 
-          ctx.clearRect(0, 0, rect.width, rect.height);
-          ctx.drawImage(courtImg, 0, 0, rect.width, rect.height);
-          drawPlaybackTrails(ctx, s, playbackSteps);
+        ctx.clearRect(0, 0, rect.width, rect.height);
+        ctx.drawImage(courtImg, 0, 0, rect.width, rect.height);
+        drawPlaybackTrails(ctx, s, playbackSteps);
 
-          for (let i = 0; i < PIECE_COUNT; i++) {
-            const pts = playPaths[i];
-            let pos;
-            if (pts && pts.length >= 2) {
-              pos = interpolatePath(pts, t);
-            } else {
-              pos = startPos[i];
-            }
-            drawPieceOnCanvas(ctx, pos.x, pos.y, TYPES[i], LABELS[i]);
-          }
-          drawAnnotationOnCanvas(ctx, step.annotation, rect.width, rect.height);
-
-          if (rawT < 1) {
-            playbackRAF = requestAnimationFrame(frame);
-          } else if (holdTime > 0) {
-            setTimeout(resolve, holdTime);
+        for (let i = 0; i < PIECE_COUNT; i++) {
+          const pts = playPaths[i];
+          let pos;
+          if (pts && pts.length >= 2) {
+            pos = interpolatePath(pts, t);
           } else {
-            resolve();
+            pos = startPos[i];
           }
+          drawPieceOnCanvas(ctx, pos.x, pos.y, TYPES[i], LABELS[i]);
         }
-        playbackRAF = requestAnimationFrame(frame);
+        drawAnnotationOnCanvas(ctx, step.annotation, rect.width, rect.height);
       });
+      if (!stepCompleted) break;
 
       base = endPos;
+      if (s < playbackSteps.length - 1) {
+        const holdCompleted = await runPlaybackSegment(STEP_HOLD_MS, () => {});
+        if (!holdCompleted) break;
+      }
     }
 
     if (recorder) {
-      recorder.stop();
-      await new Promise((resolve, reject) => {
+      const recorderStopped = new Promise((resolve, reject) => {
         recorder.onstop = resolve;
         recorder.onerror = () => reject(new Error('录制失败'));
       });
+      recorder.stop();
+      await recorderStopped;
+
+      if (playbackStopRequested) {
+        chunks.length = 0;
+        return;
+      }
 
       let blob = new Blob(chunks, { type: mimeType.includes('mp4') ? 'video/mp4' : 'video/webm' });
       const isWebM = !mimeType.includes('mp4');
 
       // 修复 WebM 时长元数据（VLC 等播放器需要完整的 Duration）
       if (isWebM) {
-        const totalMs = Math.round(
-          (playbackSteps.length * STEP_PLAY_MS +
-            Math.max(0, playbackSteps.length - 1) * STEP_HOLD_MS) / playSpeed
-        );
+        const totalMs = Math.max(1, Math.round(performance.now() - recordingStartedAt));
         try {
           await loadFixWebmDuration();
           if (typeof window.ysFixWebmDuration === 'function') {
@@ -1143,10 +1209,15 @@ async function playAll(shouldRecord = false) {
     }
   } finally {
     if (playbackRAF) cancelAnimationFrame(playbackRAF);
+    playbackRAF = null;
+    playbackWaitResolve = null;
+    if (recordingStream) recordingStream.getTracks().forEach(track => track.stop());
     canvas.style.display = 'none';
     trailLayer.style.display = 'block';
     court.querySelectorAll('.piece').forEach(el => el.style.display = 'flex');
     isPlaying = false;
+    isRecordingPlayback = false;
+    playbackStopRequested = false;
     updateUI();
   }
 }
