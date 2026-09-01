@@ -262,8 +262,31 @@ h1 { margin-bottom: 8px; font-size: 22px; }
   cursor: pointer;
   white-space: nowrap;
 }
+.library-action:disabled { opacity: 0.55; cursor: wait; }
 .library-section-title { margin: 20px 0 10px; font-size: 16px; }
 .library-help { color: #9ca3af; font-size: 12px; line-height: 1.5; margin-top: 8px; }
+.directory-settings {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 6px;
+  background: #101a33;
+}
+.directory-status { flex: 1; min-width: 220px; color: #c6ccda; font-size: 12px; }
+.directory-status.ready { color: #86efac; }
+.directory-status.warn { color: #fde68a; }
+.directory-settings button {
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 4px;
+  background: #0f3460;
+  color: #fff;
+  cursor: pointer;
+}
 .library-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
@@ -331,7 +354,7 @@ h1 { margin-bottom: 8px; font-size: 22px; }
   <button id="btn-undo" class="warn" onclick="undoMove()">↩ 撤销拖动</button>
   <button id="btn-reset-step" class="warn" onclick="resetStep()">🔄 重置步骤</button>
   <button id="btn-reset-all" onclick="resetAll()">🗑 重置全部</button>
-  <button id="btn-record" onclick="playAll(true)">📹 保存视频</button>
+  <button id="btn-record" onclick="playAll(true)">📹 保存 MP4</button>
 </div>
 
 <div class="file-warning" id="file-warning">
@@ -365,9 +388,14 @@ h1 { margin-bottom: 8px; font-size: 22px; }
           <label for="tactic-description">战术基础描述</label>
           <textarea id="tactic-description" maxlength="500" placeholder="说明适用场景、目标和关键执行点"></textarea>
         </div>
-        <button class="library-action" type="button" onclick="saveCurrentTacticLocally()">保存到本机</button>
+        <button class="library-action" id="btn-save-local" type="button" onclick="saveCurrentTacticLocally()" disabled>保存到本机和文件夹</button>
       </div>
-      <p class="library-help">本机战术保存在当前浏览器、当前网站的本地存储中；不会上传，也不会在设备之间同步。重要战术建议同时导出 JSON 备份。</p>
+      <div class="directory-settings">
+        <span class="directory-status" id="tactic-directory-status">正在检查战术文件夹…</span>
+        <button type="button" onclick="chooseTacticDirectory()">选择/更改文件夹</button>
+        <button type="button" onclick="syncTacticsFromRememberedDirectory(true)">重新读取</button>
+      </div>
+      <p class="library-help">首次保存请指定一个固定文件夹，之后会默认在该文件夹写入和查找 JSON。浏览器只会显示文件夹名称，无法告诉网页完整系统路径；请务必自行记住所选位置。浏览器数据被清除后，重新选择原文件夹即可找回其中的战术。</p>
 
       <h3 class="library-section-title">公开模板</h3>
       <div class="library-grid" id="preset-tactics"><div class="library-empty">正在加载仓库模板…</div></div>
@@ -389,6 +417,9 @@ const STEP_HOLD_MS = 400;
 const TACTIC_SCHEMA_VERSION = 2;
 const LOCAL_TACTICS_KEY = 'basket-board:custom-tactics:v1';
 const MAX_LOCAL_TACTICS = 50;
+const TACTIC_HANDLE_DB_NAME = 'basket-board-files';
+const TACTIC_HANDLE_STORE = 'handles';
+const TACTIC_DIRECTORY_KEY = 'tactics-directory';
 
 // ==================== 状态 ====================
 let setupPositions = [];
@@ -402,6 +433,8 @@ let currentLocalTacticId = null;
 let presetTactics = [];
 let presetsLoaded = false;
 let currentTacticMetadata = { author: '', tags: [] };
+let tacticDirectoryHandle = null;
+let tacticDirectoryLoaded = false;
 
 const court = document.getElementById('court');
 const trailLayer = document.getElementById('trail-layer');
@@ -1087,28 +1120,26 @@ async function playAll(shouldRecord = false) {
         }
       }
 
-      const ext = isWebM ? '.webm' : '.mp4';
       const baseName = 'tactic_' + new Date().toISOString().slice(0,19).replace(/[:T]/g,'-');
-
-      // 先下载原始格式
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = baseName + ext;
-      a.click();
-      URL.revokeObjectURL(url);
-
-      // 如果是 WebM，显示转码提示条
       if (isWebM) {
-        showTranscodePrompt(blob, baseName + '.mp4');
+        const result = await transcodeWebmToMp4(blob, baseName + '.mp4');
+        if (!result.ok) {
+          downloadBlob(blob, baseName + '.webm');
+          alert(`MP4 自动转码失败：${getErrorMessage(result.error)}\n\n为避免视频丢失，已自动保存 WebM 备份。`);
+        }
+      } else {
+        downloadBlob(blob, baseName + '.mp4');
       }
+      blob = null;
+      chunks.length = 0;
     }
   } catch (err) {
     console.error('播放/录制错误:', err);
-    if (err.name === 'SecurityError' || err.message.toLowerCase().includes('insecure')) {
+    const errorMessage = getErrorMessage(err);
+    if ((err && err.name === 'SecurityError') || errorMessage.toLowerCase().includes('insecure')) {
       alert('录制失败：浏览器安全策略限制。\n如果通过本地文件(file://)打开，请通过 HTTP 服务器访问（如 python -m http.server 或 npx serve），或换用 Chrome/Edge/Safari 浏览器。');
     } else {
-      alert('播放失败: ' + err.message);
+      alert('播放失败: ' + errorMessage);
     }
   } finally {
     if (playbackRAF) cancelAnimationFrame(playbackRAF);
@@ -1389,7 +1420,199 @@ function writeLocalTactics(tactics) {
   }
 }
 
-function saveCurrentTacticLocally() {
+function updateTacticDirectoryStatus(message, state = '') {
+  const status = document.getElementById('tactic-directory-status');
+  if (!status) return;
+  status.textContent = message;
+  status.className = `directory-status ${state}`.trim();
+}
+
+function supportsTacticDirectoryAccess() {
+  return typeof window.showDirectoryPicker === 'function' && 'indexedDB' in window;
+}
+
+function openTacticHandleDatabase() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(TACTIC_HANDLE_DB_NAME, 1);
+    request.onupgradeneeded = () => {
+      if (!request.result.objectStoreNames.contains(TACTIC_HANDLE_STORE)) {
+        request.result.createObjectStore(TACTIC_HANDLE_STORE);
+      }
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error || new Error('无法打开目录记录数据库'));
+  });
+}
+
+async function readRememberedTacticDirectory() {
+  const db = await openTacticHandleDatabase();
+  try {
+    return await new Promise((resolve, reject) => {
+      const request = db.transaction(TACTIC_HANDLE_STORE, 'readonly')
+        .objectStore(TACTIC_HANDLE_STORE)
+        .get(TACTIC_DIRECTORY_KEY);
+      request.onsuccess = () => resolve(request.result || null);
+      request.onerror = () => reject(request.error || new Error('无法读取战术文件夹记录'));
+    });
+  } finally {
+    db.close();
+  }
+}
+
+async function rememberTacticDirectory(handle) {
+  const db = await openTacticHandleDatabase();
+  try {
+    await new Promise((resolve, reject) => {
+      const request = db.transaction(TACTIC_HANDLE_STORE, 'readwrite')
+        .objectStore(TACTIC_HANDLE_STORE)
+        .put(handle, TACTIC_DIRECTORY_KEY);
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error || new Error('无法记住战术文件夹'));
+    });
+  } finally {
+    db.close();
+  }
+}
+
+async function queryDirectoryPermission(handle, requestIfNeeded = false) {
+  const options = { mode: 'readwrite' };
+  if (typeof handle.queryPermission === 'function' && await handle.queryPermission(options) === 'granted') {
+    return true;
+  }
+  if (requestIfNeeded && typeof handle.requestPermission === 'function') {
+    return await handle.requestPermission(options) === 'granted';
+  }
+  return false;
+}
+
+async function initializeTacticDirectoryAccess() {
+  try {
+    if (!supportsTacticDirectoryAccess()) {
+      updateTacticDirectoryStatus('当前浏览器不支持固定文件夹访问；保存时会自动下载 JSON 备份。', 'warn');
+      return;
+    }
+    tacticDirectoryHandle = await readRememberedTacticDirectory();
+    tacticDirectoryLoaded = true;
+    if (!tacticDirectoryHandle) {
+      updateTacticDirectoryStatus('尚未指定文件夹，首次保存时会询问。', 'warn');
+      return;
+    }
+    if (await queryDirectoryPermission(tacticDirectoryHandle, false)) {
+      updateTacticDirectoryStatus(`已连接文件夹：${tacticDirectoryHandle.name}`, 'ready');
+      await syncTacticsFromRememberedDirectory(false);
+    } else {
+      updateTacticDirectoryStatus(`已记住文件夹：${tacticDirectoryHandle.name}；点击“重新读取”授权访问。`, 'warn');
+    }
+  } catch (error) {
+    console.warn('读取战术文件夹记录失败:', error);
+    updateTacticDirectoryStatus('无法读取上次的文件夹，请重新选择。', 'warn');
+  } finally {
+    tacticDirectoryLoaded = true;
+    const saveButton = document.getElementById('btn-save-local');
+    if (saveButton) saveButton.disabled = false;
+  }
+}
+
+async function chooseTacticDirectory(showReminder = true) {
+  if (!supportsTacticDirectoryAccess()) {
+    alert('当前浏览器不支持固定文件夹访问。请使用最新版 Chrome 或 Edge；本页面仍会保存浏览器副本并自动下载 JSON 备份。');
+    return null;
+  }
+  try {
+    const handle = await window.showDirectoryPicker({
+      id: 'basket-board-tactics',
+      mode: 'readwrite'
+    });
+    tacticDirectoryHandle = handle;
+    tacticDirectoryLoaded = true;
+    await rememberTacticDirectory(handle);
+    updateTacticDirectoryStatus(`已连接文件夹：${handle.name}`, 'ready');
+    await syncTacticsFromRememberedDirectory(false);
+    if (showReminder) {
+      alert(`已选择战术文件夹“${handle.name}”。\n\n请务必记住它在电脑上的完整位置；网页只能记住访问权限，无法显示系统完整路径。清除浏览器数据后，可重新选择这个文件夹找回战术。`);
+    }
+    return handle;
+  } catch (error) {
+    if (error && error.name === 'AbortError') {
+      updateTacticDirectoryStatus('未选择文件夹；保存时将下载 JSON 备份。', 'warn');
+      return null;
+    }
+    updateTacticDirectoryStatus('文件夹选择失败，请重试。', 'warn');
+    alert(`文件夹选择失败：${getErrorMessage(error)}`);
+    return null;
+  }
+}
+
+async function getWritableTacticDirectory(requestIfNeeded) {
+  if (!supportsTacticDirectoryAccess()) return null;
+  if (!tacticDirectoryLoaded) await initializeTacticDirectoryAccess();
+  if (!tacticDirectoryHandle) {
+    return requestIfNeeded ? chooseTacticDirectory(false) : null;
+  }
+  if (await queryDirectoryPermission(tacticDirectoryHandle, requestIfNeeded)) {
+    updateTacticDirectoryStatus(`已连接文件夹：${tacticDirectoryHandle.name}`, 'ready');
+    return tacticDirectoryHandle;
+  }
+  updateTacticDirectoryStatus(`无法访问文件夹：${tacticDirectoryHandle.name}；请重新授权或更换文件夹。`, 'warn');
+  return null;
+}
+
+function makeLocalTacticId(name) {
+  const readable = name.replace(/[^\p{L}\p{N}_-]+/gu, '-').replace(/^-+|-+$/g, '').slice(0, 36) || 'tactic';
+  return `local-${readable}-${Date.now().toString(36)}`;
+}
+
+function getDirectoryTacticFileName(tactic) {
+  const safeId = tactic.id.replace(/[^\p{L}\p{N}_-]+/gu, '-').slice(0, 90);
+  return `basket-board-${safeId}.json`;
+}
+
+async function writeTacticToDirectory(handle, tactic) {
+  const fileHandle = await handle.getFileHandle(getDirectoryTacticFileName(tactic), { create: true });
+  const writable = await fileHandle.createWritable();
+  try {
+    await writable.write(JSON.stringify(tactic, null, 2));
+    await writable.close();
+  } catch (error) {
+    await writable.abort().catch(() => {});
+    throw error;
+  }
+}
+
+async function syncTacticsFromRememberedDirectory(showErrors = false) {
+  try {
+    const handle = await getWritableTacticDirectory(showErrors);
+    if (!handle) return 0;
+    const merged = new Map(readLocalTactics().map(tactic => [tactic.id, tactic]));
+    let found = 0;
+    for await (const [fileName, entry] of handle.entries()) {
+      if (entry.kind !== 'file' || !/^basket-board-.*\.json$/i.test(fileName)) continue;
+      try {
+        const file = await entry.getFile();
+        if (file.size > 2 * 1024 * 1024) throw new Error('文件超过 2MB');
+        const tactic = sanitizePortableTactic(JSON.parse(await file.text()));
+        merged.set(tactic.id, tactic);
+        found++;
+      } catch (error) {
+        console.warn(`忽略无法读取的战术文件 ${fileName}:`, error);
+      }
+    }
+    const tactics = [...merged.values()].sort((a, b) =>
+      String(b.updatedAt || '').localeCompare(String(a.updatedAt || ''))
+    );
+    writeLocalTactics(tactics);
+    renderLocalTactics();
+    updateTacticDirectoryStatus(`已连接文件夹：${handle.name}（读取到 ${found} 个战术）`, 'ready');
+    return found;
+  } catch (error) {
+    updateTacticDirectoryStatus('读取战术文件夹失败，请重新授权。', 'warn');
+    if (showErrors) alert(`读取战术文件夹失败：${getErrorMessage(error)}`);
+    else console.warn('读取战术文件夹失败:', error);
+    return 0;
+  }
+}
+
+async function saveCurrentTacticLocally() {
   const nameInput = document.getElementById('tactic-name');
   const name = nameInput.value.trim();
   if (!name) {
@@ -1398,26 +1621,54 @@ function saveCurrentTacticLocally() {
     return;
   }
 
+  let tactic;
+  let tactics;
+  let existingIndex;
   try {
-    const tactics = readLocalTactics();
-    const existingIndex = currentLocalTacticId
+    tactics = readLocalTactics();
+    existingIndex = currentLocalTacticId
       ? tactics.findIndex(tactic => tactic.id === currentLocalTacticId)
       : -1;
     const existing = existingIndex >= 0 ? tactics[existingIndex] : null;
-    const tactic = createPortableTactic({
-      id: existing ? existing.id : makeTacticId('local'),
+    tactic = createPortableTactic({
+      id: existing ? existing.id : (currentLocalTacticId || makeLocalTacticId(name)),
       name,
       createdAt: existing ? existing.createdAt : undefined
     });
+    currentLocalTacticId = tactic.id;
+  } catch (error) {
+    alert(getErrorMessage(error));
+    return;
+  }
+
+  let browserCopySaved = true;
+  try {
     if (existingIndex >= 0) tactics.splice(existingIndex, 1);
     tactics.unshift(tactic);
     writeLocalTactics(tactics);
-    currentLocalTacticId = tactic.id;
     renderLocalTactics();
-    alert(existing ? '本机战术已更新。' : '战术已保存到本机浏览器。');
   } catch (error) {
-    alert(getErrorMessage(error));
+    browserCopySaved = false;
+    console.warn('浏览器战术副本保存失败:', error);
   }
+
+  const handle = await getWritableTacticDirectory(true);
+  if (handle) {
+    try {
+      await writeTacticToDirectory(handle, tactic);
+      updateTacticDirectoryStatus(`已保存到文件夹：${handle.name}`, 'ready');
+      const browserCopyMessage = browserCopySaved ? '浏览器副本也已更新。' : '浏览器存储空间不足，但文件夹副本已成功写入。';
+      alert(`战术已保存到文件夹“${handle.name}”。${browserCopyMessage}\n\n请务必记住该文件夹的完整位置，避免清除浏览器数据后找不到。`);
+      return;
+    } catch (error) {
+      console.error('写入战术文件夹失败:', error);
+      updateTacticDirectoryStatus(`写入文件夹 ${handle.name} 失败，已改为下载备份。`, 'warn');
+    }
+  }
+
+  downloadTacticJson(tactic);
+  const browserCopyMessage = browserCopySaved ? '战术也已保存在当前浏览器。' : '浏览器副本未能写入，请保管好下载文件。';
+  alert(`已下载 JSON 备份。${browserCopyMessage}\n\n请记住浏览器的下载位置；清除网站数据后需要用该 JSON 找回。`);
 }
 
 function createTacticCard(tactic, source) {
@@ -1527,11 +1778,21 @@ function loadLibraryTactic(tactic, source) {
   }
 }
 
-function deleteLocalTactic(id) {
+async function deleteLocalTactic(id) {
   const tactics = readLocalTactics();
   const target = tactics.find(tactic => tactic.id === id);
-  if (!target || !confirm(`确定删除本机战术“${target.name}”吗？`)) return;
+  if (!target || !confirm(`确定删除本机战术“${target.name}”吗？\n\n如果已连接战术文件夹，对应 JSON 也会被删除且无法恢复。`)) return;
   writeLocalTactics(tactics.filter(tactic => tactic.id !== id));
+  const handle = await getWritableTacticDirectory(false);
+  if (handle) {
+    try {
+      await handle.removeEntry(getDirectoryTacticFileName(target));
+    } catch (error) {
+      if (!error || error.name !== 'NotFoundError') {
+        alert(`浏览器记录已删除，但文件夹中的 JSON 删除失败：${getErrorMessage(error)}`);
+      }
+    }
+  }
   if (currentLocalTacticId === id) currentLocalTacticId = null;
   renderLocalTactics();
 }
@@ -1546,6 +1807,7 @@ function openTacticLibrary() {
   document.body.style.overflow = 'hidden';
   renderLocalTactics();
   loadPresetTactics();
+  syncTacticsFromRememberedDirectory(false);
 }
 
 function closeTacticLibrary() {
@@ -1580,39 +1842,15 @@ window.addEventListener('resize', () => {
 
 // ==================== 启动 ====================
 init();
+initializeTacticDirectoryAccess();
 
-// ==================== 转码提示条 ====================
-function showTranscodePrompt(webmBlob, mp4Filename) {
-  // 移除旧的提示条
-  const old = document.getElementById('transcode-prompt');
-  if (old) old.remove();
-
-  const div = document.createElement('div');
-  div.id = 'transcode-prompt';
-  div.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#222;color:#fff;padding:14px 20px;border-radius:8px;font-family:sans-serif;font-size:14px;z-index:9998;display:flex;align-items:center;gap:14px;box-shadow:0 4px 20px rgba(0,0,0,0.4);max-width:90%;flex-wrap:wrap;';
-  div.innerHTML = `
-    <span>📹 已保存 WebM（电脑可播放）</span>
-    <button id="transcode-btn" style="padding:6px 14px;background:#4CAF50;border:none;color:#fff;border-radius:4px;cursor:pointer;font-size:13px;white-space:nowrap;">📱 转码为手机 MP4</button>
-    <button id="transcode-dismiss" style="padding:6px 10px;background:rgba(255,255,255,0.15);border:none;color:#fff;border-radius:4px;cursor:pointer;font-size:13px;">忽略</button>
-  `;
-  document.body.appendChild(div);
-
-  div.querySelector('#transcode-btn').onclick = () => {
-    div.remove();
-    transcodeWebmToMp4(webmBlob, mp4Filename);
-  };
-  div.querySelector('#transcode-dismiss').onclick = () => {
-    div.remove();
-  };
-
-  // 10 秒后自动消失
-  setTimeout(() => {
-    if (document.getElementById('transcode-prompt') === div) {
-      div.style.transition = 'opacity 0.5s';
-      div.style.opacity = '0';
-      setTimeout(() => div.remove(), 500);
-    }
-  }, 10000);
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
 // ==================== ffmpeg.wasm 转码 ====================
@@ -1630,15 +1868,8 @@ function createProgressOverlay(title, subtitle) {
       <div id="ffmpeg-progress-bar" style="width:0%;height:100%;background:#4CAF50;border-radius:3px;transition:width 0.3s;"></div>
     </div>
     <div id="ffmpeg-progress-text" style="margin-top:12px;font-size:13px;opacity:0.7;">0%</div>
-    <button id="ffmpeg-cancel-btn" style="margin-top:24px;padding:8px 20px;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);color:white;border-radius:4px;cursor:pointer;font-size:13px;">取消</button>
   `;
   document.body.appendChild(div);
-
-  let cancelled = false;
-  div.querySelector('#ffmpeg-cancel-btn').onclick = () => {
-    cancelled = true;
-    div.remove();
-  };
 
   return {
     setProgress(pct) {
@@ -1651,8 +1882,7 @@ function createProgressOverlay(title, subtitle) {
       const text = div.querySelector('#ffmpeg-progress-text');
       if (text) text.textContent = txt;
     },
-    remove() { div.remove(); },
-    get cancelled() { return cancelled; }
+    remove() { div.remove(); }
   };
 }
 
@@ -1752,7 +1982,6 @@ async function loadFfmpeg() {
     return ffmpegInstance;
   } catch (e) {
     console.error('ffmpeg 加载失败:', e);
-    alert('视频编码器加载失败。\n错误: ' + getErrorMessage(e));
     throw e;
   } finally {
     if (coreBlobURL) URL.revokeObjectURL(coreBlobURL);
@@ -1764,19 +1993,22 @@ async function loadFfmpeg() {
 
 async function transcodeWebmToMp4(webmBlob, filename) {
   const overlay = createProgressOverlay('🎬 正在转码为 MP4', '请稍候，正在转换为手机兼容格式…');
+  let ffmpeg = null;
+  let progressHandler = null;
 
   try {
-    const { ffmpeg, fetchFile } = await loadFfmpeg();
-    if (overlay.cancelled) return;
+    const loaded = await loadFfmpeg();
+    ffmpeg = loaded.ffmpeg;
 
     overlay.setText('正在写入视频数据…');
-    await ffmpeg.writeFile('input.webm', await fetchFile(webmBlob));
+    await ffmpeg.writeFile('input.webm', await loaded.fetchFile(webmBlob));
 
-    ffmpeg.on('progress', ({ progress }) => {
+    progressHandler = ({ progress }) => {
       const pct = Math.round(Math.min(100, Math.max(0, progress * 100)));
       overlay.setProgress(pct);
       overlay.setText(`转码中… ${pct}%`);
-    });
+    };
+    ffmpeg.on('progress', progressHandler);
 
     overlay.setText('开始转码…');
     await ffmpeg.exec([
@@ -1794,25 +2026,21 @@ async function transcodeWebmToMp4(webmBlob, filename) {
 
     overlay.setText('正在生成文件…');
     const data = await ffmpeg.readFile('output.mp4');
-    const mp4Blob = new Blob([data.buffer], { type: 'video/mp4' });
+    const mp4Blob = new Blob([data], { type: 'video/mp4' });
+    downloadBlob(mp4Blob, filename);
 
-    // 清理临时文件
-    await ffmpeg.deleteFile('input.webm');
-    await ffmpeg.deleteFile('output.mp4');
-
-    const url = URL.createObjectURL(mp4Blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(url);
-
-    overlay.remove();
     alert('✅ MP4 转码完成！文件已下载，可直接在手机播放。');
+    return { ok: true };
   } catch (e) {
-    overlay.remove();
     console.error('转码失败:', e);
-    alert('转码失败: ' + getErrorMessage(e));
+    return { ok: false, error: e };
+  } finally {
+    if (ffmpeg && progressHandler) ffmpeg.off('progress', progressHandler);
+    if (ffmpeg) {
+      await ffmpeg.deleteFile('input.webm').catch(() => {});
+      await ffmpeg.deleteFile('output.mp4').catch(() => {});
+    }
+    overlay.remove();
   }
 }
 
