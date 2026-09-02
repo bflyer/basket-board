@@ -1,4 +1,4 @@
-const CACHE_NAME = 'basketball-tactics-v8';
+const CACHE_NAME = 'basketball-tactics-v9';
 const RUNTIME_CACHE_NAME = 'basketball-tactics-runtime-v1';
 const urlsToCache = [
   './',

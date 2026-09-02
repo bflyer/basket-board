@@ -369,7 +369,7 @@ h1 { margin-bottom: 8px; font-size: 22px; }
 </div>
 
 <div class="annotation-box" id="annotation-box">
-  <label>步骤注释</label>
+  <label>步骤注释（按 Enter 换行）</label>
   <textarea id="annotation-text" rows="2" placeholder="在此输入当前步骤的注释，播放时会同步显示（按 Enter 可换行）..." maxlength="120" disabled></textarea>
 </div>
 
@@ -453,6 +453,16 @@ annoInput.addEventListener('input', function() {
     steps[currentStep].annotation = this.value;
     stepPlaybackCursor = 0;
   }
+});
+
+// 某些浏览器/输入法组合可能会把 Enter 当作提交或确认；在注释框内始终明确插入换行。
+annoInput.addEventListener('keydown', function(event) {
+  if (event.key !== 'Enter' || event.isComposing || event.ctrlKey || event.metaKey || event.altKey) return;
+  event.preventDefault();
+  const start = this.selectionStart ?? this.value.length;
+  const end = this.selectionEnd ?? start;
+  this.setRangeText('\n', start, end, 'end');
+  this.dispatchEvent(new Event('input', { bubbles: true }));
 });
 
 // ==================== 初始化 ====================
