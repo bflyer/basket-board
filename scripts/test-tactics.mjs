@@ -22,7 +22,7 @@ assert(Array.isArray(index.tactics) && index.tactics.length > 0, 'tactics/index.
 const ids = new Set();
 for (const entry of index.tactics) {
   assert(entry && typeof entry.id === 'string' && entry.id, '索引项缺少 id');
-  assert(typeof entry.file === 'string' && /^[a-z0-9-]+\.json$/.test(entry.file), `${entry.id}: 文件名不安全`);
+  assert(typeof entry.file === 'string' && /^[\p{L}\p{N}_-]+\.json$/u.test(entry.file), `${entry.id}: 文件名不安全`);
   assert(!ids.has(entry.id), `${entry.id}: id 重复`);
   ids.add(entry.id);
 

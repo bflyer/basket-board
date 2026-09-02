@@ -107,8 +107,8 @@ Debug APK 输出在 `android/app/build/outputs/apk/debug/app-debug.apk`。Androi
 ```json
 {
   "schemaVersion": 2,
-  "id": "horns-pick-and-roll",
-  "name": "牛角挡拆",
+  "id": "fist-double-high-screen",
+  "name": "拳头（弧顶双掩护）",
   "description": "战术基础描述",
   "author": "Basket Board",
   "tags": ["半场进攻", "挡拆"],

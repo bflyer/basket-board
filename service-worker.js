@@ -1,4 +1,4 @@
-const CACHE_NAME = 'basketball-tactics-v9';
+const CACHE_NAME = 'basketball-tactics-v10';
 const RUNTIME_CACHE_NAME = 'basketball-tactics-runtime-v1';
 const urlsToCache = [
   './',
@@ -9,9 +9,9 @@ const urlsToCache = [
   './icon-512.png',
   './fix-webm-duration.js',
   './tactics/index.json',
-  './tactics/horns-pick-and-roll.json',
-  './tactics/three-lane-fast-break.json',
-  './tactics/baseline-screen-inbound.json',
+  './tactics/拳头-弧顶双掩护.json',
+  './tactics/剪刀-交叉双掩护.json',
+  './tactics/帕子.json',
   './ffmpeg/ffmpeg.js',
   './ffmpeg/814.ffmpeg.js'
 ];

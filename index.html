@@ -383,7 +383,7 @@ h1 { margin-bottom: 8px; font-size: 22px; }
       <div class="library-editor">
         <div class="library-field">
           <label for="tactic-name">当前战术名称</label>
-          <input id="tactic-name" maxlength="60" placeholder="例如：牛角挡拆">
+          <input id="tactic-name" maxlength="60" placeholder="例如：拳头">
         </div>
         <div class="library-field">
           <label for="tactic-description">战术基础描述</label>
@@ -470,16 +470,16 @@ function getDefaultPositions() {
   const w = court.clientWidth;
   const h = court.clientHeight;
   return [
-    {x: w*0.25, y: h*0.30},
-    {x: w*0.15, y: h*0.50},
-    {x: w*0.25, y: h*0.70},
-    {x: w*0.40, y: h*0.40},
-    {x: w*0.40, y: h*0.60},
-    {x: w*0.75, y: h*0.30},
-    {x: w*0.85, y: h*0.50},
-    {x: w*0.75, y: h*0.70},
-    {x: w*0.60, y: h*0.40},
-    {x: w*0.60, y: h*0.60},
+    {x: w*0.36, y: h*0.38},
+    {x: w*0.36, y: h*0.62},
+    {x: w*0.18, y: h*0.72},
+    {x: w*0.18, y: h*0.28},
+    {x: w*0.18, y: h*0.50},
+    {x: w*0.64, y: h*0.38},
+    {x: w*0.64, y: h*0.62},
+    {x: w*0.82, y: h*0.72},
+    {x: w*0.82, y: h*0.28},
+    {x: w*0.82, y: h*0.50},
     {x: w*0.50, y: h*0.50},
   ];
 }
@@ -1916,7 +1916,7 @@ async function loadPresetTactics() {
     const index = await response.json();
     if (!index || !Array.isArray(index.tactics)) throw new Error('模板索引格式错误');
     const loaded = await Promise.all(index.tactics.map(async entry => {
-      if (!entry || typeof entry.file !== 'string' || !/^[a-z0-9-]+\.json$/.test(entry.file)) {
+      if (!entry || typeof entry.file !== 'string' || !/^[\p{L}\p{N}_-]+\.json$/u.test(entry.file)) {
         throw new Error('模板文件路径无效');
       }
       const tacticResponse = await fetch(new URL(entry.file, new URL('./tactics/', window.location.href)));

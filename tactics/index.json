@@ -2,16 +2,16 @@
   "schemaVersion": 1,
   "tactics": [
     {
-      "id": "horns-pick-and-roll",
-      "file": "horns-pick-and-roll.json"
+      "id": "fist-double-high-screen",
+      "file": "拳头-弧顶双掩护.json"
     },
     {
-      "id": "three-lane-fast-break",
-      "file": "three-lane-fast-break.json"
+      "id": "scissors-cross-screen",
+      "file": "剪刀-交叉双掩护.json"
     },
     {
-      "id": "baseline-screen-inbound",
-      "file": "baseline-screen-inbound.json"
+      "id": "handkerchief-zone-offense",
+      "file": "帕子.json"
     }
   ]
 }
