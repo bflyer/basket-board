@@ -16,15 +16,18 @@ function validatePoint(point, label) {
   assert(point.x >= 0 && point.x <= 1 && point.y >= 0 && point.y <= 1, `${label}: 坐标超出 0–1`);
 }
 
-assert(index.schemaVersion === 1, 'tactics/index.json: 不支持的索引版本');
+assert(index.schemaVersion === 2, 'tactics/index.json: 不支持的索引版本');
 assert(Array.isArray(index.tactics) && index.tactics.length > 0, 'tactics/index.json: tactics 不能为空');
 
 const ids = new Set();
+const categoryCounts = { tactic: 0, exercise: 0 };
 for (const entry of index.tactics) {
   assert(entry && typeof entry.id === 'string' && entry.id, '索引项缺少 id');
   assert(typeof entry.file === 'string' && /^[\p{L}\p{N}_-]+\.json$/u.test(entry.file), `${entry.id}: 文件名不安全`);
   assert(!ids.has(entry.id), `${entry.id}: id 重复`);
   ids.add(entry.id);
+  assert(entry.category === 'tactic' || entry.category === 'exercise', `${entry.id}: 栏目无效`);
+  categoryCounts[entry.category]++;
 
   const tactic = JSON.parse(await readFile(join(tacticsDir, entry.file), 'utf8'));
   assert(tactic.schemaVersion === 2, `${entry.file}: schemaVersion 必须为 2`);
@@ -52,4 +55,6 @@ for (const entry of index.tactics) {
   });
 }
 
-console.log(`Validated ${ids.size} repository tactics.`);
+assert(categoryCounts.tactic > 0, '战术区不能为空');
+assert(categoryCounts.exercise > 0, '练习区不能为空');
+console.log(`Validated ${ids.size} repository items (${categoryCounts.tactic} tactics, ${categoryCounts.exercise} exercises).`);

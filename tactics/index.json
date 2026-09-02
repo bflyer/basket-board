@@ -1,17 +1,40 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "tactics": [
     {
       "id": "fist-double-high-screen",
-      "file": "拳头-弧顶双掩护.json"
+      "file": "拳头-弧顶双掩护.json",
+      "category": "tactic"
     },
     {
       "id": "scissors-cross-screen",
-      "file": "剪刀-交叉双掩护.json"
+      "file": "剪刀-交叉双掩护.json",
+      "category": "tactic"
     },
     {
       "id": "handkerchief-zone-offense",
-      "file": "帕子.json"
+      "file": "帕子.json",
+      "category": "tactic"
+    },
+    {
+      "id": "three-player-direct-layup",
+      "file": "三人全场配合-直接上篮.json",
+      "category": "exercise"
+    },
+    {
+      "id": "three-player-handoff-back-cut",
+      "file": "三人全场配合-手递手反跑.json",
+      "category": "exercise"
+    },
+    {
+      "id": "three-player-double-handoff-roll",
+      "file": "三人全场配合-双手递手-下顺.json",
+      "category": "exercise"
+    },
+    {
+      "id": "three-player-drive-kick-screen-cut",
+      "file": "三人全场配合-突分-无球掩护内切.json",
+      "category": "exercise"
     }
   ]
 }

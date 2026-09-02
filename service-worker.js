@@ -1,4 +1,4 @@
-const CACHE_NAME = 'basketball-tactics-v10';
+const CACHE_NAME = 'basketball-tactics-v11';
 const RUNTIME_CACHE_NAME = 'basketball-tactics-runtime-v1';
 const urlsToCache = [
   './',
@@ -12,6 +12,10 @@ const urlsToCache = [
   './tactics/拳头-弧顶双掩护.json',
   './tactics/剪刀-交叉双掩护.json',
   './tactics/帕子.json',
+  './tactics/三人全场配合-直接上篮.json',
+  './tactics/三人全场配合-手递手反跑.json',
+  './tactics/三人全场配合-双手递手-下顺.json',
+  './tactics/三人全场配合-突分-无球掩护内切.json',
   './ffmpeg/ffmpeg.js',
   './ffmpeg/814.ffmpeg.js'
 ];

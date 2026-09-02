@@ -263,7 +263,28 @@ h1 { margin-bottom: 8px; font-size: 22px; }
   white-space: nowrap;
 }
 .library-action:disabled { opacity: 0.55; cursor: wait; }
-.library-section-title { margin: 20px 0 10px; font-size: 16px; }
+.library-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 20px 0 10px;
+}
+.library-section-title { font-size: 16px; }
+.library-row-controls { display: flex; align-items: center; gap: 6px; }
+.library-row-hint { color: #8490aa; font-size: 11px; }
+.library-row-controls button {
+  width: 30px;
+  height: 28px;
+  border: 1px solid rgba(255,255,255,0.14);
+  border-radius: 5px;
+  background: #0f3460;
+  color: #fff;
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+}
+.library-row-controls button:hover { background: #16508a; }
 .library-help { color: #9ca3af; font-size: 12px; line-height: 1.5; margin-top: 8px; }
 .directory-settings {
   display: flex;
@@ -287,10 +308,25 @@ h1 { margin-bottom: 8px; font-size: 22px; }
   color: #fff;
   cursor: pointer;
 }
-.library-grid {
+.library-row {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(260px, 290px);
   gap: 10px;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  scroll-snap-type: x proximity;
+  scrollbar-color: #365a88 #101a33;
+  scrollbar-width: thin;
+  padding: 1px 1px 10px;
+}
+.library-row::-webkit-scrollbar { height: 8px; }
+.library-row::-webkit-scrollbar-track { background: #101a33; border-radius: 999px; }
+.library-row::-webkit-scrollbar-thumb { background: #365a88; border-radius: 999px; }
+.library-row::-webkit-scrollbar-thumb:hover { background: #4c78ad; }
+.library-row:focus-visible {
+  outline: 2px solid #38bdf8;
+  outline-offset: 3px;
 }
 .tactic-card {
   display: flex;
@@ -301,6 +337,7 @@ h1 { margin-bottom: 8px; font-size: 22px; }
   border: 1px solid rgba(255,255,255,0.12);
   border-radius: 8px;
   background: #101a33;
+  scroll-snap-align: start;
 }
 .tactic-card h3 { font-size: 15px; }
 .tactic-card p { color: #c6ccda; font-size: 13px; line-height: 1.5; flex: 1; }
@@ -327,6 +364,8 @@ h1 { margin-bottom: 8px; font-size: 22px; }
   .library-panel { max-height: 100vh; border-radius: 0; }
   .library-editor { grid-template-columns: 1fr; }
   .library-action { width: 100%; }
+  .library-row { grid-auto-columns: minmax(240px, 86vw); }
+  .library-row-hint { display: none; }
 }
 </style>
 </head>
@@ -398,11 +437,35 @@ h1 { margin-bottom: 8px; font-size: 22px; }
       </div>
       <p class="library-help">首次保存请指定一个固定文件夹，之后会默认在该文件夹写入和查找 JSON。浏览器只会显示文件夹名称，无法告诉网页完整系统路径；请务必自行记住所选位置。浏览器数据被清除后，重新选择原文件夹即可找回其中的战术。</p>
 
-      <h3 class="library-section-title">公开模板</h3>
-      <div class="library-grid" id="preset-tactics"><div class="library-empty">正在加载仓库模板…</div></div>
+      <div class="library-section-heading">
+        <h3 class="library-section-title">🏀 战术区</h3>
+        <div class="library-row-controls">
+          <span class="library-row-hint">左右滑动查看更多</span>
+          <button type="button" onclick="scrollLibraryRow('tactic-templates', -1)" aria-label="向左查看战术">‹</button>
+          <button type="button" onclick="scrollLibraryRow('tactic-templates', 1)" aria-label="向右查看战术">›</button>
+        </div>
+      </div>
+      <div class="library-row" id="tactic-templates" tabindex="0"><div class="library-empty">正在加载战术模板…</div></div>
 
-      <h3 class="library-section-title">我的本机战术</h3>
-      <div class="library-grid" id="local-tactics"></div>
+      <div class="library-section-heading">
+        <h3 class="library-section-title">🏃 练习区</h3>
+        <div class="library-row-controls">
+          <span class="library-row-hint">左右滑动查看更多</span>
+          <button type="button" onclick="scrollLibraryRow('exercise-templates', -1)" aria-label="向左查看练习">‹</button>
+          <button type="button" onclick="scrollLibraryRow('exercise-templates', 1)" aria-label="向右查看练习">›</button>
+        </div>
+      </div>
+      <div class="library-row" id="exercise-templates" tabindex="0"><div class="library-empty">正在加载练习模板…</div></div>
+
+      <div class="library-section-heading">
+        <h3 class="library-section-title">✏️ 自定义战术区</h3>
+        <div class="library-row-controls">
+          <span class="library-row-hint">左右滑动查看更多</span>
+          <button type="button" onclick="scrollLibraryRow('local-tactics', -1)" aria-label="向左查看自定义战术">‹</button>
+          <button type="button" onclick="scrollLibraryRow('local-tactics', 1)" aria-label="向右查看自定义战术">›</button>
+        </div>
+      </div>
+      <div class="library-row" id="local-tactics" tabindex="0"></div>
     </div>
   </div>
 </div>
@@ -1894,6 +1957,28 @@ function renderTacticList(container, tactics, source, emptyText) {
   tactics.forEach(tactic => container.appendChild(createTacticCard(tactic, source)));
 }
 
+function scrollLibraryRow(rowId, direction) {
+  const row = document.getElementById(rowId);
+  if (!row) return;
+  const distance = Math.max(270, Math.round(row.clientWidth * 0.8));
+  row.scrollBy({ left: direction * distance, behavior: 'smooth' });
+}
+
+function renderPresetTactics() {
+  renderTacticList(
+    document.getElementById('tactic-templates'),
+    presetTactics.filter(tactic => tactic.libraryCategory === 'tactic'),
+    'preset',
+    '仓库内暂无默认战术。'
+  );
+  renderTacticList(
+    document.getElementById('exercise-templates'),
+    presetTactics.filter(tactic => tactic.libraryCategory === 'exercise'),
+    'preset',
+    '仓库内暂无默认练习。'
+  );
+}
+
 function renderLocalTactics() {
   renderTacticList(
     document.getElementById('local-tactics'),
@@ -1904,9 +1989,8 @@ function renderLocalTactics() {
 }
 
 async function loadPresetTactics() {
-  const container = document.getElementById('preset-tactics');
   if (presetsLoaded) {
-    renderTacticList(container, presetTactics, 'preset', '仓库内暂无公开模板。');
+    renderPresetTactics();
     return;
   }
 
@@ -1914,26 +1998,32 @@ async function loadPresetTactics() {
     const response = await fetch('./tactics/index.json');
     if (!response.ok) throw new Error(`模板索引 HTTP ${response.status}`);
     const index = await response.json();
-    if (!index || !Array.isArray(index.tactics)) throw new Error('模板索引格式错误');
+    if (!index || index.schemaVersion !== 2 || !Array.isArray(index.tactics)) throw new Error('模板索引格式错误');
     const loaded = await Promise.all(index.tactics.map(async entry => {
       if (!entry || typeof entry.file !== 'string' || !/^[\p{L}\p{N}_-]+\.json$/u.test(entry.file)) {
         throw new Error('模板文件路径无效');
+      }
+      if (!['tactic', 'exercise'].includes(entry.category)) {
+        throw new Error(`${entry.file} 的栏目无效`);
       }
       const tacticResponse = await fetch(new URL(entry.file, new URL('./tactics/', window.location.href)));
       if (!tacticResponse.ok) throw new Error(`${entry.file} HTTP ${tacticResponse.status}`);
       const tactic = sanitizePortableTactic(await tacticResponse.json());
       if (entry.id && entry.id !== tactic.id) throw new Error(`${entry.file} 的 id 与索引不一致`);
+      tactic.libraryCategory = entry.category;
       return tactic;
     }));
     presetTactics = loaded;
     presetsLoaded = true;
-    renderTacticList(container, presetTactics, 'preset', '仓库内暂无公开模板。');
+    renderPresetTactics();
   } catch (error) {
-    container.replaceChildren();
-    const empty = document.createElement('div');
-    empty.className = 'library-empty';
-    empty.textContent = `公开模板加载失败：${getErrorMessage(error)}`;
-    container.appendChild(empty);
+    ['tactic-templates', 'exercise-templates'].forEach(id => {
+      const container = document.getElementById(id);
+      const empty = document.createElement('div');
+      empty.className = 'library-empty';
+      empty.textContent = `默认内容加载失败：${getErrorMessage(error)}`;
+      container.replaceChildren(empty);
+    });
   }
 }
 
