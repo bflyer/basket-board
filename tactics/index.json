@@ -1,20 +1,35 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "tactics": [
     {
       "id": "fist-double-high-screen",
       "file": "拳头-弧顶双掩护.json",
-      "category": "tactic"
+      "category": "tactic",
+      "section": "offense"
     },
     {
       "id": "scissors-cross-screen",
       "file": "剪刀-交叉双掩护.json",
-      "category": "tactic"
+      "category": "tactic",
+      "section": "offense"
     },
     {
       "id": "handkerchief-zone-offense",
       "file": "帕子.json",
-      "category": "tactic"
+      "category": "tactic",
+      "section": "offense"
+    },
+    {
+      "id": "one-two-two-full-court-press",
+      "file": "122-全场紧逼.json",
+      "category": "tactic",
+      "section": "zone-defense"
+    },
+    {
+      "id": "two-one-two-half-court-zone",
+      "file": "212-半场联防.json",
+      "category": "tactic",
+      "section": "zone-defense"
     },
     {
       "id": "three-player-direct-layup",
@@ -34,6 +49,11 @@
     {
       "id": "three-player-drive-kick-screen-cut",
       "file": "三人全场配合-突分-无球掩护内切.json",
+      "category": "exercise"
+    },
+    {
+      "id": "pick-and-roll-trap-five-player-rotation",
+      "file": "夹击挡拆五人轮转练习.json",
       "category": "exercise"
     }
   ]

@@ -16,11 +16,12 @@ function validatePoint(point, label) {
   assert(point.x >= 0 && point.x <= 1 && point.y >= 0 && point.y <= 1, `${label}: 坐标超出 0–1`);
 }
 
-assert(index.schemaVersion === 2, 'tactics/index.json: 不支持的索引版本');
+assert(index.schemaVersion === 3, 'tactics/index.json: 不支持的索引版本');
 assert(Array.isArray(index.tactics) && index.tactics.length > 0, 'tactics/index.json: tactics 不能为空');
 
 const ids = new Set();
 const categoryCounts = { tactic: 0, exercise: 0 };
+const tacticSectionCounts = { offense: 0, 'zone-defense': 0 };
 for (const entry of index.tactics) {
   assert(entry && typeof entry.id === 'string' && entry.id, '索引项缺少 id');
   assert(typeof entry.file === 'string' && /^[\p{L}\p{N}_-]+\.json$/u.test(entry.file), `${entry.id}: 文件名不安全`);
@@ -28,6 +29,10 @@ for (const entry of index.tactics) {
   ids.add(entry.id);
   assert(entry.category === 'tactic' || entry.category === 'exercise', `${entry.id}: 栏目无效`);
   categoryCounts[entry.category]++;
+  if (entry.category === 'tactic') {
+    assert(entry.section === 'offense' || entry.section === 'zone-defense', `${entry.id}: 战术版块无效`);
+    tacticSectionCounts[entry.section]++;
+  }
 
   const tactic = JSON.parse(await readFile(join(tacticsDir, entry.file), 'utf8'));
   assert(tactic.schemaVersion === 2, `${entry.file}: schemaVersion 必须为 2`);
@@ -41,8 +46,9 @@ for (const entry of index.tactics) {
   assert(Array.isArray(tactic.steps) && tactic.steps.length > 0, `${entry.file}: 至少需要一个步骤`);
 
   tactic.steps.forEach((step, stepIndex) => {
-    assert(typeof step.annotation === 'string' && step.annotation.trim(), `${entry.file} 步骤 ${stepIndex + 1}: 缺少描述`);
-    assert(Array.isArray(step.moves) && step.moves.length > 0, `${entry.file} 步骤 ${stepIndex + 1}: 缺少移动`);
+    assert(typeof step.annotation === 'string', `${entry.file} 步骤 ${stepIndex + 1}: 描述格式无效`);
+    assert(Array.isArray(step.moves), `${entry.file} 步骤 ${stepIndex + 1}: 移动格式无效`);
+    assert(step.annotation.trim() || step.moves.length > 0, `${entry.file} 步骤 ${stepIndex + 1}: 描述和移动不能同时为空`);
     step.moves.forEach((move, moveIndex) => {
       assert(Number.isInteger(move.pieceIndex) && move.pieceIndex >= 0 && move.pieceIndex < pieceCount,
         `${entry.file} 步骤 ${stepIndex + 1} 移动 ${moveIndex + 1}: pieceIndex 无效`);
@@ -57,4 +63,6 @@ for (const entry of index.tactics) {
 
 assert(categoryCounts.tactic > 0, '战术区不能为空');
 assert(categoryCounts.exercise > 0, '练习区不能为空');
-console.log(`Validated ${ids.size} repository items (${categoryCounts.tactic} tactics, ${categoryCounts.exercise} exercises).`);
+assert(tacticSectionCounts.offense > 0, '进攻版块不能为空');
+assert(tacticSectionCounts['zone-defense'] > 0, '联防版块不能为空');
+console.log(`Validated ${ids.size} repository items (${tacticSectionCounts.offense} offense, ${tacticSectionCounts['zone-defense']} zone defense, ${categoryCounts.exercise} exercises).`);

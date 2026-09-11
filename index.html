@@ -270,6 +270,13 @@ h1 { margin-bottom: 8px; font-size: 22px; }
   gap: 10px;
   margin: 20px 0 10px;
 }
+.library-group-title {
+  margin-top: 20px;
+  padding-left: 10px;
+  border-left: 3px solid #38bdf8;
+  font-size: 17px;
+}
+.library-group-title + .library-section-heading { margin-top: 10px; }
 .library-section-title { font-size: 16px; }
 .library-row-controls { display: flex; align-items: center; gap: 6px; }
 .library-row-hint { color: #8490aa; font-size: 11px; }
@@ -379,6 +386,7 @@ h1 { margin-bottom: 8px; font-size: 22px; }
   <button id="btn-finish" class="primary" onclick="finishStep()">✅ 完成步骤</button>
   <button id="btn-play" onclick="togglePlayback()">▶ 播放全部</button>
   <button id="btn-play-step" onclick="toggleStepPlayback()">⏭ 逐步播放：第 1 步</button>
+  <button id="btn-play-current" onclick="toggleCurrentStepPlayback()">▶ 播放当前步骤</button>
   <label class="speed-label">
     速度
     <input type="range" id="speed-slider" min="0.25" max="1" step="0.25" value="0.5" oninput="updateSpeed(this.value)">
@@ -437,15 +445,26 @@ h1 { margin-bottom: 8px; font-size: 22px; }
       </div>
       <p class="library-help">首次保存请指定一个固定文件夹，之后会默认在该文件夹写入和查找 JSON。浏览器只会显示文件夹名称，无法告诉网页完整系统路径；请务必自行记住所选位置。浏览器数据被清除后，重新选择原文件夹即可找回其中的战术。</p>
 
+      <h3 class="library-group-title">🏀 战术区</h3>
       <div class="library-section-heading">
-        <h3 class="library-section-title">🏀 战术区</h3>
+        <h4 class="library-section-title">进攻版块</h4>
         <div class="library-row-controls">
           <span class="library-row-hint">左右滑动查看更多</span>
-          <button type="button" onclick="scrollLibraryRow('tactic-templates', -1)" aria-label="向左查看战术">‹</button>
-          <button type="button" onclick="scrollLibraryRow('tactic-templates', 1)" aria-label="向右查看战术">›</button>
+          <button type="button" onclick="scrollLibraryRow('offense-templates', -1)" aria-label="向左查看进攻战术">‹</button>
+          <button type="button" onclick="scrollLibraryRow('offense-templates', 1)" aria-label="向右查看进攻战术">›</button>
         </div>
       </div>
-      <div class="library-row" id="tactic-templates" tabindex="0"><div class="library-empty">正在加载战术模板…</div></div>
+      <div class="library-row" id="offense-templates" tabindex="0"><div class="library-empty">正在加载进攻战术…</div></div>
+
+      <div class="library-section-heading">
+        <h4 class="library-section-title">联防版块</h4>
+        <div class="library-row-controls">
+          <span class="library-row-hint">左右滑动查看更多</span>
+          <button type="button" onclick="scrollLibraryRow('zone-defense-templates', -1)" aria-label="向左查看联防战术">‹</button>
+          <button type="button" onclick="scrollLibraryRow('zone-defense-templates', 1)" aria-label="向右查看联防战术">›</button>
+        </div>
+      </div>
+      <div class="library-row" id="zone-defense-templates" tabindex="0"><div class="library-empty">正在加载联防战术…</div></div>
 
       <div class="library-section-heading">
         <h3 class="library-section-title">🏃 练习区</h3>
@@ -755,6 +774,7 @@ function updateUI() {
   const btnFinish = document.getElementById('btn-finish');
   const btnPlay = document.getElementById('btn-play');
   const btnPlayStep = document.getElementById('btn-play-step');
+  const btnPlayCurrent = document.getElementById('btn-play-current');
   const btnRecord = document.getElementById('btn-record');
   const btnResetAll = document.getElementById('btn-reset-all');
   const btnLibrary = document.getElementById('btn-library');
@@ -762,12 +782,16 @@ function updateUI() {
 
   if (isPlaying) {
     stepInfo.textContent = isRecordingPlayback ? '录制中…' : '播放中…';
-    [btnPrev, btnUndo, btnResetStep, btnFinish, btnPlay, btnPlayStep, btnRecord, btnResetAll, btnLibrary]
+    [btnPrev, btnUndo, btnResetStep, btnFinish, btnPlay, btnPlayStep, btnPlayCurrent, btnRecord, btnResetAll, btnLibrary]
       .forEach(b => b.disabled = true);
     if (playbackMode === 'step') {
       btnPlayStep.disabled = false;
       btnPlayStep.textContent = '⏹ 停止播放';
       btnPlayStep.classList.add('warn');
+    } else if (playbackMode === 'current') {
+      btnPlayCurrent.disabled = false;
+      btnPlayCurrent.textContent = '⏹ 停止播放';
+      btnPlayCurrent.classList.add('warn');
     } else {
       btnPlay.disabled = false;
       btnPlay.textContent = '⏹ 停止播放';
@@ -790,6 +814,9 @@ function updateUI() {
     ? `⏭ 逐步播放：第 ${stepPlaybackCursor + 1} 步`
     : '⏭ 逐步播放';
   btnPlayStep.classList.remove('warn');
+  btnPlayCurrent.disabled = currentStep < 0 || !hasStepContent(steps[currentStep]);
+  btnPlayCurrent.textContent = '▶ 播放当前步骤';
+  btnPlayCurrent.classList.remove('warn');
   btnRecord.disabled = playableStepCount < 1 || isFileProtocol;
   btnRecord.title = (isFileProtocol && playableStepCount >= 1)
     ? '通过本地文件(file://)打开时无法录制视频，请通过 HTTP 服务器访问（如 python3 -m http.server）'
@@ -1114,6 +1141,15 @@ function toggleStepPlayback() {
   playAll(false, stepPlaybackCursor);
 }
 
+function toggleCurrentStepPlayback() {
+  if (isPlaying) {
+    stopPlayback();
+    return;
+  }
+  if (currentStep < 0 || !hasStepContent(steps[currentStep])) return;
+  playAll(false, currentStep, false);
+}
+
 function stopPlayback() {
   if (!isPlaying || playbackStopRequested) return;
   playbackStopRequested = true;
@@ -1159,7 +1195,7 @@ function runPlaybackSegment(baseDurationMs, onProgress) {
   });
 }
 
-async function playAll(shouldRecord = false, singleStepIndex = null) {
+async function playAll(shouldRecord = false, singleStepIndex = null, advanceStepCursor = true) {
   const playbackSteps = getPlaybackSteps();
   if (isPlaying || playbackSteps.length < 1) return;
   const isSingleStep = Number.isInteger(singleStepIndex);
@@ -1168,7 +1204,9 @@ async function playAll(shouldRecord = false, singleStepIndex = null) {
   const lastPlaybackStep = isSingleStep ? singleStepIndex + 1 : playbackSteps.length;
   isPlaying = true;
   isRecordingPlayback = shouldRecord;
-  playbackMode = isSingleStep ? 'step' : (shouldRecord ? 'record' : 'all');
+  playbackMode = isSingleStep
+    ? (advanceStepCursor ? 'step' : 'current')
+    : (shouldRecord ? 'record' : 'all');
   playbackStopRequested = false;
   updateUI();
 
@@ -1310,7 +1348,9 @@ async function playAll(shouldRecord = false, singleStepIndex = null) {
 
     if (isSingleStep && !playbackStopRequested) {
       currentStep = firstPlaybackStep;
-      stepPlaybackCursor = lastPlaybackStep >= playbackSteps.length ? 0 : lastPlaybackStep;
+      if (advanceStepCursor) {
+        stepPlaybackCursor = lastPlaybackStep >= playbackSteps.length ? 0 : lastPlaybackStep;
+      }
     }
 
     if (recorder) {
@@ -1966,10 +2006,16 @@ function scrollLibraryRow(rowId, direction) {
 
 function renderPresetTactics() {
   renderTacticList(
-    document.getElementById('tactic-templates'),
-    presetTactics.filter(tactic => tactic.libraryCategory === 'tactic'),
+    document.getElementById('offense-templates'),
+    presetTactics.filter(tactic => tactic.librarySection === 'offense'),
     'preset',
-    '仓库内暂无默认战术。'
+    '仓库内暂无进攻战术。'
+  );
+  renderTacticList(
+    document.getElementById('zone-defense-templates'),
+    presetTactics.filter(tactic => tactic.librarySection === 'zone-defense'),
+    'preset',
+    '仓库内暂无联防战术。'
   );
   renderTacticList(
     document.getElementById('exercise-templates'),
@@ -1998,7 +2044,7 @@ async function loadPresetTactics() {
     const response = await fetch('./tactics/index.json');
     if (!response.ok) throw new Error(`模板索引 HTTP ${response.status}`);
     const index = await response.json();
-    if (!index || index.schemaVersion !== 2 || !Array.isArray(index.tactics)) throw new Error('模板索引格式错误');
+    if (!index || index.schemaVersion !== 3 || !Array.isArray(index.tactics)) throw new Error('模板索引格式错误');
     const loaded = await Promise.all(index.tactics.map(async entry => {
       if (!entry || typeof entry.file !== 'string' || !/^[\p{L}\p{N}_-]+\.json$/u.test(entry.file)) {
         throw new Error('模板文件路径无效');
@@ -2006,18 +2052,22 @@ async function loadPresetTactics() {
       if (!['tactic', 'exercise'].includes(entry.category)) {
         throw new Error(`${entry.file} 的栏目无效`);
       }
+      if (entry.category === 'tactic' && !['offense', 'zone-defense'].includes(entry.section)) {
+        throw new Error(`${entry.file} 的战术版块无效`);
+      }
       const tacticResponse = await fetch(new URL(entry.file, new URL('./tactics/', window.location.href)));
       if (!tacticResponse.ok) throw new Error(`${entry.file} HTTP ${tacticResponse.status}`);
       const tactic = sanitizePortableTactic(await tacticResponse.json());
       if (entry.id && entry.id !== tactic.id) throw new Error(`${entry.file} 的 id 与索引不一致`);
       tactic.libraryCategory = entry.category;
+      tactic.librarySection = entry.category === 'tactic' ? entry.section : 'exercise';
       return tactic;
     }));
     presetTactics = loaded;
     presetsLoaded = true;
     renderPresetTactics();
   } catch (error) {
-    ['tactic-templates', 'exercise-templates'].forEach(id => {
+    ['offense-templates', 'zone-defense-templates', 'exercise-templates'].forEach(id => {
       const container = document.getElementById(id);
       const empty = document.createElement('div');
       empty.className = 'library-empty';
