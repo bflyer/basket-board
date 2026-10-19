@@ -26,5 +26,5 @@
     <path d="M165 270 L165 330" stroke="#38bdf8" stroke-width="4"/><path d="M155 320 L165 334 L175 320" fill="none" stroke="#38bdf8" stroke-width="4"/>
     <rect x="70" y="345" width="190" height="58" rx="8" fill="#101a33" stroke="#38bdf8"/><text x="165" y="370" text-anchor="middle" class="h" font-size="17">进入下一个步骤</text><text x="165" y="391" text-anchor="middle" class="t">继续拖动、注释、完成</text>
   </g>
-  <rect x="70" y="525" width="1060" height="48" rx="8" fill="#16213e"/><text x="600" y="556" text-anchor="middle" class="t" font-size="17">提示：返回较早步骤后再点“完成步骤”，其后的步骤会被新的分支替换；重要战术请先保存。</text>
+  <rect x="70" y="515" width="1060" height="62" rx="8" fill="#16213e"/><text x="600" y="541" text-anchor="middle" class="t" font-size="17">修改已有步骤的字幕后，请点“下一步”继续检查，原有后续步骤会完整保留。</text><text x="600" y="565" text-anchor="middle" class="t" font-size="15">“完成步骤”用于从当前位置重新编排，点击后原有后续步骤会被新的分支替换。</text>
 </svg>

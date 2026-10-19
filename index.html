@@ -383,6 +383,7 @@ h1 { margin-bottom: 8px; font-size: 22px; }
 <div class="controls">
   <button id="btn-prev" onclick="goPrev()">⬅ 上一步</button>
   <span class="step-info" id="step-info">初始摆放</span>
+  <button id="btn-next" onclick="goNext()">➡ 下一步</button>
   <button id="btn-finish" class="primary" onclick="finishStep()">✅ 完成步骤</button>
   <button id="btn-play" onclick="togglePlayback()">▶ 播放全部</button>
   <button id="btn-play-step" onclick="toggleStepPlayback()">⏭ 逐步播放：第 1 步</button>
@@ -771,6 +772,7 @@ function updateUI() {
   const btnPrev = document.getElementById('btn-prev');
   const btnUndo = document.getElementById('btn-undo');
   const btnResetStep = document.getElementById('btn-reset-step');
+  const btnNext = document.getElementById('btn-next');
   const btnFinish = document.getElementById('btn-finish');
   const btnPlay = document.getElementById('btn-play');
   const btnPlayStep = document.getElementById('btn-play-step');
@@ -782,7 +784,7 @@ function updateUI() {
 
   if (isPlaying) {
     stepInfo.textContent = isRecordingPlayback ? '录制中…' : '播放中…';
-    [btnPrev, btnUndo, btnResetStep, btnFinish, btnPlay, btnPlayStep, btnPlayCurrent, btnRecord, btnResetAll, btnLibrary]
+    [btnPrev, btnUndo, btnResetStep, btnNext, btnFinish, btnPlay, btnPlayStep, btnPlayCurrent, btnRecord, btnResetAll, btnLibrary]
       .forEach(b => b.disabled = true);
     if (playbackMode === 'step') {
       btnPlayStep.disabled = false;
@@ -829,6 +831,7 @@ function updateUI() {
   if (currentStep < 0) {
     stepInfo.textContent = `初始摆放`;
     btnPrev.disabled = true;
+    btnNext.disabled = totalSteps < 1;
     btnUndo.disabled = true;
     btnResetStep.disabled = true;
     btnFinish.textContent = '✅ 完成初始摆放';
@@ -838,6 +841,7 @@ function updateUI() {
   } else {
     stepInfo.textContent = `步骤 ${currentStep + 1} / ${totalSteps}（编辑中）`;
     btnPrev.disabled = false;
+    btnNext.disabled = currentStep >= totalSteps - 1;
     btnFinish.textContent = '✅ 完成步骤';
     btnFinish.disabled = false;
     annoInput.disabled = false;
@@ -869,6 +873,14 @@ function goPrev() {
   if (isPlaying || activeMove || currentStep < 0) return;
   currentStep--;
   stepPlaybackCursor = Math.max(0, currentStep);
+  renderPieces();
+  updateUI();
+}
+
+// 只浏览已有步骤，不改写步骤数组；适合修改注释后继续向后检查。
+function goNext() {
+  if (isPlaying || activeMove || currentStep >= steps.length - 1) return;
+  currentStep++;
   renderPieces();
   updateUI();
 }
