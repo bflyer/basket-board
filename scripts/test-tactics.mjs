@@ -6,6 +6,7 @@ const projectRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 const tacticsDir = join(projectRoot, 'tactics');
 const index = JSON.parse(await readFile(join(tacticsDir, 'index.json'), 'utf8'));
 const pieceCount = 11;
+const moveTypes = new Set(['run', 'dribble', 'pass', 'screen', 'shot']);
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -54,6 +55,8 @@ for (const entry of index.tactics) {
         `${entry.file} 步骤 ${stepIndex + 1} 移动 ${moveIndex + 1}: pieceIndex 无效`);
       assert(Array.isArray(move.points) && move.points.length >= 2,
         `${entry.file} 步骤 ${stepIndex + 1} 移动 ${moveIndex + 1}: 轨迹点不足`);
+      assert(move.moveType === undefined || moveTypes.has(move.moveType),
+        `${entry.file} 步骤 ${stepIndex + 1} 移动 ${moveIndex + 1}: 路线类型无效`);
       move.points.forEach((point, pointIndex) =>
         validatePoint(point, `${entry.file} 步骤 ${stepIndex + 1} 移动 ${moveIndex + 1} 点 ${pointIndex + 1}`)
       );

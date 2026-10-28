@@ -74,10 +74,61 @@ h1 { margin-bottom: 8px; font-size: 22px; }
 .speed-label input { width: 80px; cursor: pointer; }
 
 /* 球场 */
+.board-workspace {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 800px);
+  gap: 10px;
+  width: min(960px, 100%);
+  align-items: stretch;
+}
+.move-type-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  background: #16213e;
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 8px;
+}
+.move-type-toolbar h2 {
+  font-size: 15px;
+  color: #f8fafc;
+}
+.move-type-toolbar .toolbar-hint {
+  margin-bottom: 2px;
+  color: #94a3b8;
+  font-size: 10px;
+  line-height: 1.35;
+}
+.move-type-button {
+  display: grid;
+  grid-template-columns: 46px 1fr;
+  gap: 7px;
+  align-items: center;
+  min-height: 42px;
+  padding: 6px 7px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: #0f3460;
+  color: #e2e8f0;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 12px;
+  text-align: left;
+}
+.move-type-button:hover { background: #16508a; }
+.move-type-button.active {
+  border-color: #38bdf8;
+  background: #075985;
+  box-shadow: 0 0 0 1px rgba(56,189,248,0.25);
+}
+.move-type-button:disabled { opacity: 0.42; cursor: not-allowed; }
+.move-type-button svg { width: 46px; height: 22px; overflow: visible; }
+.move-type-button span { line-height: 1.2; }
 .court-container {
   position: relative;
-  width: 800px;
-  max-width: 96vw;
+  width: 100%;
+  max-width: 800px;
   aspect-ratio: 94/50;
   background: #222;
   border: 3px solid #fff;
@@ -85,6 +136,17 @@ h1 { margin-bottom: 8px; font-size: 22px; }
   overflow: hidden;
   user-select: none;
   touch-action: none;
+}
+@media (max-width: 800px) {
+  .board-workspace { grid-template-columns: 1fr; width: 96vw; }
+  .move-type-toolbar {
+    flex-direction: row;
+    align-items: stretch;
+    overflow-x: auto;
+  }
+  .move-type-toolbar h2 { min-width: 58px; align-self: center; }
+  .move-type-toolbar .toolbar-hint { display: none; }
+  .move-type-button { flex: 0 0 126px; }
 }
 .court-container img {
   width: 100%; height: 100%;
@@ -410,10 +472,36 @@ h1 { margin-bottom: 8px; font-size: 22px; }
   ⚠️ 当前通过本地文件(file://)打开，视频录制功能不可用。如需保存视频，请通过 HTTP 服务器访问本页面：<code>python3 -m http.server 8080</code>
 </div>
 
-<div class="court-container" id="court">
-  <img src="basketball_court.png" alt="篮球场" draggable="false">
-  <svg id="trail-layer"></svg>
-  <canvas id="play-canvas"></canvas>
+<div class="board-workspace">
+  <aside class="move-type-toolbar" aria-label="路线类型">
+    <h2>路线类型</h2>
+    <p class="toolbar-hint">手动切换；完成步骤后恢复“无球跑动”</p>
+    <button class="move-type-button active" type="button" data-move-type="run" onclick="selectMoveType('run')" aria-pressed="true">
+      <svg viewBox="0 0 46 22" aria-hidden="true"><path d="M3 11H36" stroke="#f8fafc" stroke-width="2.5"/><path d="M35 6L43 11L35 16Z" fill="#f8fafc"/></svg>
+      <span>无球跑动</span>
+    </button>
+    <button class="move-type-button" type="button" data-move-type="dribble" onclick="selectMoveType('dribble')" aria-pressed="false">
+      <svg viewBox="0 0 46 22" aria-hidden="true"><path d="M3 11C7 3 11 19 15 11S23 3 27 11S35 19 38 11" fill="none" stroke="#f8fafc" stroke-width="2.2"/><path d="M35 6L43 11L35 16Z" fill="#f8fafc"/></svg>
+      <span>运球突破</span>
+    </button>
+    <button class="move-type-button" type="button" data-move-type="pass" onclick="selectMoveType('pass')" aria-pressed="false">
+      <svg viewBox="0 0 46 22" aria-hidden="true"><path d="M3 11H37" stroke="#f8fafc" stroke-width="2.5" stroke-dasharray="6 4"/><path d="M35 6L43 11L35 16Z" fill="#f8fafc"/></svg>
+      <span>传球</span>
+    </button>
+    <button class="move-type-button" type="button" data-move-type="screen" onclick="selectMoveType('screen')" aria-pressed="false">
+      <svg viewBox="0 0 46 22" aria-hidden="true"><path d="M3 11H38M38 4V18" fill="none" stroke="#f8fafc" stroke-width="2.5"/></svg>
+      <span>挡拆掩护</span>
+    </button>
+    <button class="move-type-button" type="button" data-move-type="shot" onclick="selectMoveType('shot')" aria-pressed="false">
+      <svg viewBox="0 0 46 22" aria-hidden="true"><path d="M3 8H36M3 14H36" stroke="#f8fafc" stroke-width="2"/><path d="M35 5L43 11L35 17Z" fill="#f8fafc"/></svg>
+      <span>投篮</span>
+    </button>
+  </aside>
+  <div class="court-container" id="court">
+    <img src="basketball_court.png" alt="篮球场" draggable="false">
+    <svg id="trail-layer"></svg>
+    <canvas id="play-canvas"></canvas>
+  </div>
 </div>
 
 <div class="annotation-box" id="annotation-box">
@@ -496,6 +584,14 @@ const PIECE_COUNT = 11;
 const LABELS = ['1','2','3','4','5','1','2','3','4','5','球'];
 const TYPES = ['red','red','red','red','red','yellow','yellow','yellow','yellow','yellow','ball'];
 const TRAIL_COLORS = ['#e63946','#e63946','#e63946','#e63946','#e63946','#f4a261','#f4a261','#f4a261','#f4a261','#f4a261','#fb8500'];
+const DEFAULT_MOVE_TYPE = 'run';
+const MOVE_TYPE_CONFIG = Object.freeze({
+  run: { label: '无球跑动' },
+  dribble: { label: '运球突破' },
+  pass: { label: '传球' },
+  screen: { label: '挡拆掩护' },
+  shot: { label: '投篮' }
+});
 const STEP_PLAY_MS = 2000; // 1x 时每步 2 秒，较低速度会按比例延长
 const STEP_HOLD_MS = 400;
 const TACTIC_SCHEMA_VERSION = 2;
@@ -510,6 +606,7 @@ let setupPositions = [];
 let steps = [];
 let currentStep = -1;
 let activeMove = null;
+let selectedMoveType = DEFAULT_MOVE_TYPE;
 let isPlaying = false;
 let playbackRAF = null;
 let playbackWaitResolve = null;
@@ -572,6 +669,7 @@ function init() {
   steps = [];
   currentStep = -1;
   activeMove = null;
+  selectedMoveType = DEFAULT_MOVE_TYPE;
   isPlaying = false;
   currentLocalTacticId = null;
   setTacticMetadata({ name: '', description: '', author: '', tags: [] });
@@ -584,6 +682,27 @@ function init() {
   stepPlaybackCursor = 0;
   renderPieces();
   updateUI();
+}
+
+function selectMoveType(moveType) {
+  if (!MOVE_TYPE_CONFIG[moveType] || isPlaying || activeMove || currentStep < 0) return;
+  selectedMoveType = moveType;
+  updateMoveTypeToolbar();
+}
+
+function resetMoveType() {
+  selectedMoveType = DEFAULT_MOVE_TYPE;
+  updateMoveTypeToolbar();
+}
+
+function updateMoveTypeToolbar() {
+  const disabled = currentStep < 0 || isPlaying || Boolean(activeMove);
+  document.querySelectorAll('.move-type-button').forEach(button => {
+    const active = button.dataset.moveType === selectedMoveType;
+    button.classList.toggle('active', active);
+    button.setAttribute('aria-pressed', active ? 'true' : 'false');
+    button.disabled = disabled;
+  });
 }
 
 // ==================== 位置计算 ====================
@@ -660,44 +779,120 @@ function drawTrails() {
     const isCurrent = s === currentStep;
     if (!isPast && !isCurrent) continue;
     for (const move of step.moves) {
-      drawPath(move.points, TRAIL_COLORS[move.pieceIndex], isPast ? 0.35 : 1.0);
+      drawPath(move.points, TRAIL_COLORS[move.pieceIndex], isPast ? 0.35 : 1.0, move.moveType);
     }
   }
   if (activeMove && activeMove.points.length > 1) {
-    drawPath(activeMove.points, TRAIL_COLORS[activeMove.pieceIndex], 1.0, true);
+    drawPath(activeMove.points, TRAIL_COLORS[activeMove.pieceIndex], 1.0, activeMove.moveType);
   }
 }
 
-function drawPath(points, color, alpha, isDashed) {
-  if (points.length < 2) return;
-  let d = `M ${points[0].x} ${points[0].y}`;
-  for (let i = 1; i < points.length; i++) {
-    d += ` L ${points[i].x} ${points[i].y}`;
+function normalizeMoveType(moveType) {
+  return MOVE_TYPE_CONFIG[moveType] ? moveType : DEFAULT_MOVE_TYPE;
+}
+
+function sanitizeMoveType(moveType, label = '路线') {
+  if (moveType === undefined) return DEFAULT_MOVE_TYPE;
+  if (typeof moveType !== 'string' || !MOVE_TYPE_CONFIG[moveType]) {
+    throw new Error(`${label} 类型无效`);
   }
+  return moveType;
+}
+
+function getLineDirection(points, index = points.length - 1) {
+  const current = points[index];
+  for (let offset = 1; offset < points.length; offset++) {
+    const previous = points[Math.max(0, index - offset)];
+    const dx = current.x - previous.x;
+    const dy = current.y - previous.y;
+    if (Math.hypot(dx, dy) > 0.5) return Math.atan2(dy, dx);
+  }
+  return 0;
+}
+
+function makeWavyPoints(points) {
+  if (points.length < 3) return points;
+  let distance = 0;
+  return points.map((point, index) => {
+    if (index === 0 || index === points.length - 1) return {x: point.x, y: point.y};
+    distance += Math.hypot(point.x - points[index - 1].x, point.y - points[index - 1].y);
+    const next = points[Math.min(points.length - 1, index + 1)];
+    const previous = points[index - 1];
+    const angle = Math.atan2(next.y - previous.y, next.x - previous.x);
+    const offset = Math.sin(distance * Math.PI * 2 / 18) * 4;
+    return {
+      x: point.x - Math.sin(angle) * offset,
+      y: point.y + Math.cos(angle) * offset
+    };
+  });
+}
+
+function offsetPathPoints(points, amount) {
+  return points.map((point, index) => {
+    const previous = points[Math.max(0, index - 1)];
+    const next = points[Math.min(points.length - 1, index + 1)];
+    const angle = Math.atan2(next.y - previous.y, next.x - previous.x);
+    return {x: point.x - Math.sin(angle) * amount, y: point.y + Math.cos(angle) * amount};
+  });
+}
+
+function pathData(points) {
+  return points.reduce((data, point, index) => `${data}${index ? ' L' : 'M'} ${point.x} ${point.y}`, '');
+}
+
+function appendSvgStroke(points, color, alpha, dash = '') {
   const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-  path.setAttribute('d', d);
+  path.setAttribute('d', pathData(points));
   path.setAttribute('stroke', color);
   path.setAttribute('stroke-width', '2.5');
   path.setAttribute('fill', 'none');
   path.setAttribute('stroke-linecap', 'round');
   path.setAttribute('stroke-linejoin', 'round');
-  if (isDashed) path.setAttribute('stroke-dasharray', '5,4');
+  if (dash) path.setAttribute('stroke-dasharray', dash);
   path.setAttribute('opacity', alpha);
   trailLayer.appendChild(path);
+}
 
+function appendSvgArrow(points, color, alpha) {
   const last = points[points.length - 1];
-  const prev = points.length > 10 ? points[points.length - 6] : points[points.length - 2];
-  const angle = Math.atan2(last.y - prev.y, last.x - prev.x);
-  const al = 10, aa = Math.PI / 7;
-  const x1 = last.x - al * Math.cos(angle - aa);
-  const y1 = last.y - al * Math.sin(angle - aa);
-  const x2 = last.x - al * Math.cos(angle + aa);
-  const y2 = last.y - al * Math.sin(angle + aa);
-  const poly = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
-  poly.setAttribute('points', `${last.x},${last.y} ${x1},${y1} ${x2},${y2}`);
-  poly.setAttribute('fill', color);
-  poly.setAttribute('opacity', alpha);
-  trailLayer.appendChild(poly);
+  const angle = getLineDirection(points);
+  const length = 10;
+  const spread = Math.PI / 7;
+  const polygon = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+  polygon.setAttribute('points', `${last.x},${last.y} ${last.x - length * Math.cos(angle - spread)},${last.y - length * Math.sin(angle - spread)} ${last.x - length * Math.cos(angle + spread)},${last.y - length * Math.sin(angle + spread)}`);
+  polygon.setAttribute('fill', color);
+  polygon.setAttribute('opacity', alpha);
+  trailLayer.appendChild(polygon);
+}
+
+function appendSvgScreenBar(points, color, alpha) {
+  const last = points[points.length - 1];
+  const angle = getLineDirection(points);
+  const half = 9;
+  const bar = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+  bar.setAttribute('x1', last.x - Math.sin(angle) * half);
+  bar.setAttribute('y1', last.y + Math.cos(angle) * half);
+  bar.setAttribute('x2', last.x + Math.sin(angle) * half);
+  bar.setAttribute('y2', last.y - Math.cos(angle) * half);
+  bar.setAttribute('stroke', color);
+  bar.setAttribute('stroke-width', '3');
+  bar.setAttribute('stroke-linecap', 'round');
+  bar.setAttribute('opacity', alpha);
+  trailLayer.appendChild(bar);
+}
+
+function drawPath(points, color, alpha, moveType = DEFAULT_MOVE_TYPE) {
+  if (points.length < 2) return;
+  const type = normalizeMoveType(moveType);
+  if (type === 'shot') {
+    appendSvgStroke(offsetPathPoints(points, -2.5), color, alpha);
+    appendSvgStroke(offsetPathPoints(points, 2.5), color, alpha);
+  } else {
+    const renderPoints = type === 'dribble' ? makeWavyPoints(points) : points;
+    appendSvgStroke(renderPoints, color, alpha, type === 'pass' ? '7,5' : '');
+  }
+  if (type === 'screen') appendSvgScreenBar(points, color, alpha);
+  else appendSvgArrow(points, color, alpha);
 }
 
 // ==================== 拖动 ====================
@@ -726,7 +921,7 @@ function onDown(e) {
   e.preventDefault();
   dragIdx = parseInt(target.dataset.index);
   const pos = getEventPos(e);
-  activeMove = { pieceIndex: dragIdx, points: [{x: pos.x, y: pos.y}] };
+  activeMove = { pieceIndex: dragIdx, moveType: selectedMoveType, points: [{x: pos.x, y: pos.y}] };
   updateUI();
 }
 
@@ -781,6 +976,7 @@ function updateUI() {
   const btnResetAll = document.getElementById('btn-reset-all');
   const btnLibrary = document.getElementById('btn-library');
   const slider = document.getElementById('speed-slider');
+  updateMoveTypeToolbar();
 
   if (isPlaying) {
     stepInfo.textContent = isRecordingPlayback ? '录制中…' : '播放中…';
@@ -864,6 +1060,7 @@ function finishStep() {
     steps.push({ moves: [], annotation: '' });
     currentStep++;
   }
+  resetMoveType();
   stepPlaybackCursor = 0;
   renderPieces();
   updateUI();
@@ -950,34 +1147,62 @@ function drawPieceOnCanvas(ctx, x, y, type, label) {
   ctx.restore();
 }
 
-function drawTrailOnCanvas(ctx, points, color, alpha) {
-  if (points.length < 2) return;
-  ctx.save();
+function strokeCanvasPath(ctx, points, color, alpha, dash = []) {
   ctx.strokeStyle = color;
   ctx.globalAlpha = alpha;
   ctx.lineWidth = 2.5;
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
-  ctx.setLineDash([5, 4]);
+  ctx.setLineDash(dash);
   ctx.beginPath();
   ctx.moveTo(points[0].x, points[0].y);
-  for (let i = 1; i < points.length; i++) {
-    ctx.lineTo(points[i].x, points[i].y);
-  }
+  for (let index = 1; index < points.length; index++) ctx.lineTo(points[index].x, points[index].y);
   ctx.stroke();
+}
+
+function drawCanvasArrow(ctx, points, color, alpha) {
   const last = points[points.length - 1];
-  const prev = points.length > 10 ? points[points.length - 6] : points[points.length - 2];
-  const angle = Math.atan2(last.y - prev.y, last.x - prev.x);
-  const al = 10, aa = Math.PI / 7;
+  const angle = getLineDirection(points);
+  const length = 10;
+  const spread = Math.PI / 7;
   ctx.setLineDash([]);
   ctx.fillStyle = color;
   ctx.globalAlpha = alpha;
   ctx.beginPath();
   ctx.moveTo(last.x, last.y);
-  ctx.lineTo(last.x - al * Math.cos(angle - aa), last.y - al * Math.sin(angle - aa));
-  ctx.lineTo(last.x - al * Math.cos(angle + aa), last.y - al * Math.sin(angle + aa));
+  ctx.lineTo(last.x - length * Math.cos(angle - spread), last.y - length * Math.sin(angle - spread));
+  ctx.lineTo(last.x - length * Math.cos(angle + spread), last.y - length * Math.sin(angle + spread));
   ctx.closePath();
   ctx.fill();
+}
+
+function drawCanvasScreenBar(ctx, points, color, alpha) {
+  const last = points[points.length - 1];
+  const angle = getLineDirection(points);
+  const half = 9;
+  ctx.strokeStyle = color;
+  ctx.globalAlpha = alpha;
+  ctx.lineWidth = 3;
+  ctx.setLineDash([]);
+  ctx.beginPath();
+  ctx.moveTo(last.x - Math.sin(angle) * half, last.y + Math.cos(angle) * half);
+  ctx.lineTo(last.x + Math.sin(angle) * half, last.y - Math.cos(angle) * half);
+  ctx.stroke();
+}
+
+function drawTrailOnCanvas(ctx, points, color, alpha, moveType = DEFAULT_MOVE_TYPE) {
+  if (points.length < 2) return;
+  ctx.save();
+  const type = normalizeMoveType(moveType);
+  if (type === 'shot') {
+    strokeCanvasPath(ctx, offsetPathPoints(points, -2.5), color, alpha);
+    strokeCanvasPath(ctx, offsetPathPoints(points, 2.5), color, alpha);
+  } else {
+    const renderPoints = type === 'dribble' ? makeWavyPoints(points) : points;
+    strokeCanvasPath(ctx, renderPoints, color, alpha, type === 'pass' ? [7, 5] : []);
+  }
+  if (type === 'screen') drawCanvasScreenBar(ctx, points, color, alpha);
+  else drawCanvasArrow(ctx, points, color, alpha);
   ctx.restore();
 }
 
@@ -990,7 +1215,7 @@ function drawPlaybackTrails(ctx, currentS, playbackSteps) {
     else if (s === currentS) alpha = 0.85;
     else break;
     for (const move of step.moves) {
-      drawTrailOnCanvas(ctx, move.points, TRAIL_COLORS[move.pieceIndex], alpha);
+      drawTrailOnCanvas(ctx, move.points, TRAIL_COLORS[move.pieceIndex], alpha, move.moveType);
     }
   }
 }
@@ -1518,6 +1743,7 @@ function sanitizePortableTactic(data) {
       }
       return {
         pieceIndex: move.pieceIndex,
+        moveType: sanitizeMoveType(move.moveType, `步骤 ${stepIndex + 1} 的移动 ${moveIndex + 1}`),
         points: move.points.map((point, pointIndex) =>
           sanitizeNormalizedPoint(point, `步骤 ${stepIndex + 1} 移动 ${moveIndex + 1} 轨迹点 ${pointIndex + 1}`)
         )
@@ -1573,6 +1799,7 @@ function createPortableTactic(overrides = {}) {
       annotation: typeof step.annotation === 'string' ? step.annotation : '',
       moves: (step.moves || []).map(move => ({
         pieceIndex: move.pieceIndex,
+        moveType: normalizeMoveType(move.moveType),
         points: move.points.map(normalizePoint)
       }))
     })),
@@ -1589,6 +1816,7 @@ function applyPortableTactic(data) {
     annotation: step.annotation,
     moves: step.moves.map(move => ({
       pieceIndex: move.pieceIndex,
+      moveType: move.moveType,
       points: move.points.map(denormalizePoint)
     }))
   }));
@@ -1613,6 +1841,7 @@ function applyLegacyTactic(data) {
       }
       return {
         pieceIndex: move.pieceIndex,
+        moveType: DEFAULT_MOVE_TYPE,
         points: move.points.map((point, pointIndex) => cleanPoint(point, `轨迹点 ${pointIndex + 1}`))
       };
     }) : []
@@ -1632,6 +1861,7 @@ function finishApplyingTactic() {
   dragIdx = -1;
   isPlaying = false;
   playbackMode = null;
+  selectedMoveType = DEFAULT_MOVE_TYPE;
   stepPlaybackCursor = 0;
   if (playbackRAF) cancelAnimationFrame(playbackRAF);
   renderPieces();
